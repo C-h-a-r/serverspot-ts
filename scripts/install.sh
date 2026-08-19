@@ -104,30 +104,40 @@ read_secret_tty() {
   printf -v "$var_name" '%s' "$value"
 }
 
-ask() {
-  local prompt="$1" default="${2:-}" answer=""
+# Write answers into a variable name — never use command substitution $(ask ...)
+# for prompts; subshells hide inline prompts on many terminals.
+ask_into() {
+  local __answer_var="$1" prompt="$2" default="${3:-}" answer=""
+  tty_echo ""
   if [[ -n "$default" ]]; then
-    tty_print "  ${BOLD}${prompt}${NC} ${DIM}[${default}]${NC}: "
+    tty_echo "  ${BOLD}${prompt}${NC}"
+    tty_echo "  ${DIM}Press Enter for default: ${default}${NC}"
   else
-    tty_print "  ${BOLD}${prompt}${NC}: "
+    tty_echo "  ${BOLD}${prompt}${NC}"
   fi
+  tty_print "  ${CYAN}>${NC} "
   read_tty answer
   if [[ -z "$answer" && -n "$default" ]]; then
     answer="$default"
   fi
-  printf '%s' "$answer"
+  printf -v "$__answer_var" '%s' "$answer"
 }
 
-ask_secret() {
-  local prompt="$1" answer=""
-  tty_print "  ${BOLD}${prompt}${NC}: "
+ask_secret_into() {
+  local __answer_var="$1" prompt="$2" answer=""
+  tty_echo ""
+  tty_echo "  ${BOLD}${prompt}${NC}"
+  tty_print "  ${CYAN}>${NC} "
   read_secret_tty answer
-  printf '%s' "$answer"
+  printf -v "$__answer_var" '%s' "$answer"
 }
 
 confirm() {
   local prompt="$1" answer=""
-  tty_print "  ${BOLD}${prompt}${NC} ${DIM}[y/N]${NC}: "
+  tty_echo ""
+  tty_echo "  ${BOLD}${prompt}${NC}"
+  tty_echo "  ${DIM}Type y for yes, anything else for no${NC}"
+  tty_print "  ${CYAN}>${NC} "
   read_tty answer
   [[ "$answer" =~ ^[Yy]$ ]]
 }
@@ -198,33 +208,34 @@ clone_or_update_repo() {
 # ─── Questionnaire ────────────────────────────────────────────────────────────
 run_questionnaire() {
   tty_echo ""
-  tty_echo "  ${BOLD}Let's configure your instance.${NC} ${DIM}Type your answers and press Enter.${NC}"
-  tty_echo ""
+  tty_echo "  ${BOLD}Let's configure your instance.${NC}"
+  tty_echo "  ${DIM}Each question is shown below — type your answer at the > line.${NC}"
 
-  DOMAIN="$(ask "Your domain (must point to this server)" "")"
+  ask_into DOMAIN "Your domain (must point to this server)" ""
   while [[ -z "$DOMAIN" ]]; do
     warn "Domain is required for HTTPS and login redirects"
-    DOMAIN="$(ask "Your domain" "")"
+    ask_into DOMAIN "Your domain" ""
   done
 
   APP_URL="https://${DOMAIN}"
 
   tty_echo ""
-  tty_echo "  ${BOLD}Admin account${NC} ${DIM}(used to sign in at /login)${NC}"
-  ADMIN_NAME="$(ask "Admin name" "Admin")"
-  ADMIN_EMAIL="$(ask "Admin email" "")"
+  tty_echo "  ${BOLD}── Admin account ──${NC} ${DIM}(used to sign in at /login)${NC}"
+
+  ask_into ADMIN_NAME "Admin name" "Admin"
+  ask_into ADMIN_EMAIL "Admin email" ""
   while [[ -z "$ADMIN_EMAIL" ]]; do
     warn "Email is required"
-    ADMIN_EMAIL="$(ask "Admin email" "")"
+    ask_into ADMIN_EMAIL "Admin email" ""
   done
 
   while true; do
-    ADMIN_PASSWORD="$(ask_secret "Admin password (min 8 characters)")"
+    ask_secret_into ADMIN_PASSWORD "Admin password (min 8 characters)"
     if [[ ${#ADMIN_PASSWORD} -lt 8 ]]; then
       warn "Password must be at least 8 characters"
       continue
     fi
-    ADMIN_PASSWORD_CONFIRM="$(ask_secret "Confirm password")"
+    ask_secret_into ADMIN_PASSWORD_CONFIRM "Confirm password"
     if [[ "$ADMIN_PASSWORD" != "$ADMIN_PASSWORD_CONFIRM" ]]; then
       warn "Passwords do not match — try again"
       continue
@@ -233,21 +244,22 @@ run_questionnaire() {
   done
 
   tty_echo ""
+  tty_echo "  ${BOLD}── Database ──${NC}"
   if confirm "Generate a secure database password automatically?"; then
     POSTGRES_PASSWORD="$(generate_secret)"
     ok "Database password generated"
   else
-    POSTGRES_PASSWORD="$(ask_secret "PostgreSQL password")"
+    ask_secret_into POSTGRES_PASSWORD "PostgreSQL password (min 8 characters)"
     while [[ ${#POSTGRES_PASSWORD} -lt 8 ]]; do
       warn "Use at least 8 characters"
-      POSTGRES_PASSWORD="$(ask_secret "PostgreSQL password")"
+      ask_secret_into POSTGRES_PASSWORD "PostgreSQL password (min 8 characters)"
     done
   fi
 
   AUTH_SECRET="$(generate_secret)"
 
   tty_echo ""
-  tty_echo "  ${BOLD}Optional integrations${NC} ${DIM}(y/N prompts — Enter skips)${NC}"
+  tty_echo "  ${BOLD}── Optional integrations ──${NC}"
   ENABLE_GATEWAY=false
   if confirm "Enable game gateway (Minecraft linking, port 3001)?"; then
     ENABLE_GATEWAY=true
@@ -256,11 +268,11 @@ run_questionnaire() {
 
   SMTP_HOST=""
   if confirm "Configure email (SMTP) now?"; then
-    SMTP_HOST="$(ask "SMTP host" "")"
-    SMTP_PORT="$(ask "SMTP port" "587")"
-    SMTP_USER="$(ask "SMTP username" "")"
-    SMTP_PASS="$(ask_secret "SMTP password")"
-    SMTP_FROM="$(ask "From address" "noreply@${DOMAIN}")"
+    ask_into SMTP_HOST "SMTP host" ""
+    ask_into SMTP_PORT "SMTP port" "587"
+    ask_into SMTP_USER "SMTP username" ""
+    ask_secret_into SMTP_PASS "SMTP password"
+    ask_into SMTP_FROM "From address" "noreply@${DOMAIN}"
   fi
 }
 
