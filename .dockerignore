@@ -1,0 +1,29 @@
+# Dependencies (installed in Docker)
+node_modules
+**/node_modules
+
+# Build outputs
+.next
+**/.next
+dist
+**/dist
+.turbo
+out
+
+# Git & env
+.git
+.env
+.env.*
+!.env.example
+
+# Local data
+uploads
+pgdata
+
+# IDE
+.idea
+.vscode
+
+# Tests & logs
+coverage
+*.log

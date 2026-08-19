@@ -19,6 +19,7 @@ ENV DATABASE_URL=$DATABASE_URL
 ENV SKIP_ENV_VALIDATION=true
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN mkdir -p apps/web/public
 RUN pnpm --filter @serverspot/web build
 
 FROM base AS runner
