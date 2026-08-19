@@ -18,8 +18,28 @@ if [[ ! -d "$INSTALL_DIR" ]]; then
   exit 1
 fi
 
+load_env() {
+  # shellcheck disable=SC1091
+  [[ -f "$INSTALL_DIR/.env" ]] && source "$INSTALL_DIR/.env"
+  USE_CADDY="${USE_CADDY:-true}"
+  HTTP_PORT="${HTTP_PORT:-80}"
+  HTTPS_PORT="${HTTPS_PORT:-443}"
+}
+
 compose() {
   docker compose -f "$INSTALL_DIR/docker-compose.yml" --project-directory "$INSTALL_DIR" "$@"
+}
+
+get_profiles() {
+  load_env
+  local profiles=""
+  if [[ "$USE_CADDY" == "true" ]]; then
+    profiles="--profile caddy"
+  fi
+  if grep -q '^GAME_GATEWAY_URL=' "$INSTALL_DIR/.env" 2>/dev/null; then
+    profiles="$profiles --profile gateway"
+  fi
+  printf '%s' "$profiles"
 }
 
 usage() {
@@ -38,13 +58,19 @@ HELP
 }
 
 cmd_status() {
+  load_env
   echo -e "${BOLD}ServerSpot status${NC}\n"
   compose ps
   echo ""
   if curl -fsS "http://127.0.0.1:3000/api/health" >/dev/null 2>&1; then
-    echo -e "${GREEN}✓${NC} Web health check passed"
+    echo -e "${GREEN}✓${NC} Web health check passed (127.0.0.1:3000)"
   else
     echo -e "${RED}✗${NC} Web health check failed (is the stack running?)"
+  fi
+  if [[ "$USE_CADDY" == "true" ]]; then
+    echo -e "${DIM}Caddy ports: ${HTTP_PORT} (HTTP) / ${HTTPS_PORT} (HTTPS)${NC}"
+  else
+    echo -e "${DIM}Caddy disabled — proxy to 127.0.0.1:3000${NC}"
   fi
 }
 
@@ -53,10 +79,8 @@ cmd_logs() {
 }
 
 cmd_restart() {
-  local profiles="--profile caddy"
-  if grep -q '^GAME_GATEWAY_URL=' "$INSTALL_DIR/.env" 2>/dev/null; then
-    profiles="$profiles --profile gateway"
-  fi
+  local profiles
+  profiles="$(get_profiles)"
   # shellcheck disable=SC2086
   compose $profiles up -d
   echo -e "${GREEN}✓${NC} Services restarted"
@@ -79,12 +103,7 @@ cmd_update() {
   compose up -d postgres
   sleep 3
   cmd_migrate
-  local profiles="--profile caddy"
-  if grep -q '^GAME_GATEWAY_URL=' "$INSTALL_DIR/.env" 2>/dev/null; then
-    profiles="$profiles --profile gateway"
-  fi
-  # shellcheck disable=SC2086
-  compose $profiles up -d
+  cmd_restart
   echo -e "\n${GREEN}✓${NC} Update complete"
 }
 

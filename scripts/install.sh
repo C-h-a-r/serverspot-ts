@@ -34,6 +34,9 @@ fi
 STEP=0
 TOTAL_STEPS=8
 UPDATE_MODE=false
+HTTP_PORT=80
+HTTPS_PORT=443
+USE_CADDY=true
 
 # ─── Terminal I/O (always use /dev/tty so prompts work when script is piped) ─
 require_tty() {
@@ -146,6 +149,139 @@ generate_secret() {
   openssl rand -base64 36 | tr -d '/+=' | head -c 48
 }
 
+port_in_use() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -tlnH "sport = :${port}" 2>/dev/null | grep -q .
+    return
+  fi
+  if command -v netstat >/dev/null 2>&1; then
+    netstat -tln 2>/dev/null | grep -q ":${port} "
+    return
+  fi
+  (echo >/dev/tcp/127.0.0.1/"${port}") >/dev/null 2>&1
+}
+
+port_usage_hint() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -tlnp "sport = :${port}" 2>/dev/null | tail -n +2 | head -3
+  fi
+}
+
+valid_port() {
+  local port="$1"
+  [[ "$port" =~ ^[0-9]+$ && "$port" -ge 1 && "$port" -le 65535 ]]
+}
+
+build_app_url() {
+  local host="${DOMAIN%%:*}"
+  if [[ "$USE_CADDY" == "true" && "$HTTPS_PORT" != "443" ]]; then
+    APP_URL="https://${host}:${HTTPS_PORT}"
+  else
+    APP_URL="https://${host}"
+  fi
+}
+
+pick_free_port() {
+  local __var="$1" prompt="$2" default="$3" candidate=""
+  while true; do
+    ask_into candidate "$prompt" "$default"
+    if ! valid_port "$candidate"; then
+      warn "Enter a port number between 1 and 65535"
+      continue
+    fi
+    if port_in_use "$candidate"; then
+      warn "Port ${candidate} is already in use:"
+      port_usage_hint "$candidate" | while read -r line; do info "$line"; done
+      continue
+    fi
+    printf -v "$__var" '%s' "$candidate"
+    return
+  done
+}
+
+configure_networking() {
+  tty_echo ""
+  tty_echo "  ${BOLD}── Web ports ──${NC}"
+  tty_echo "  ${DIM}ServerSpot uses Caddy for HTTPS on ports 80 and 443 by default.${NC}"
+
+  local port80_busy=false port443_busy=false
+  port_in_use 80 && port80_busy=true
+  port_in_use 443 && port443_busy=true
+
+  if [[ "$port80_busy" != true && "$port443_busy" != true ]]; then
+    HTTP_PORT=80
+    HTTPS_PORT=443
+    USE_CADDY=true
+    build_app_url
+    ok "Ports 80 and 443 are available for Caddy"
+    return
+  fi
+
+  if [[ "$port80_busy" == true ]]; then
+    warn "Port 80 (HTTP) is already in use:"
+    port_usage_hint 80 | while read -r line; do [[ -n "$line" ]] && info "    $line"; done
+  fi
+  if [[ "$port443_busy" == true ]]; then
+    warn "Port 443 (HTTPS) is already in use:"
+    port_usage_hint 443 | while read -r line; do [[ -n "$line" ]] && info "    $line"; done
+  fi
+
+  tty_echo ""
+  tty_echo "  ${BOLD}How would you like to handle this?${NC}"
+  tty_echo "    ${BOLD}1${NC}) Use alternate ports ${DIM}(8080 HTTP, 8443 HTTPS)${NC}"
+  tty_echo "    ${BOLD}2${NC}) Choose custom ports"
+  tty_echo "    ${BOLD}3${NC}) Skip Caddy ${DIM}(use nginx/Coolify/etc. — proxy to 127.0.0.1:3000)${NC}"
+  ask_into PROXY_CHOICE "Enter choice" "1"
+
+  case "$PROXY_CHOICE" in
+    3)
+      USE_CADDY=false
+      HTTP_PORT=80
+      HTTPS_PORT=443
+      build_app_url
+      ok "Caddy disabled — point your reverse proxy to 127.0.0.1:3000"
+      return
+      ;;
+    1)
+      if ! port_in_use 8080 && ! port_in_use 8443; then
+        USE_CADDY=true
+        HTTP_PORT=8080
+        HTTPS_PORT=8443
+        build_app_url
+        ok "Using alternate ports 8080 (HTTP) and 8443 (HTTPS)"
+        warn "Site URL: ${APP_URL} — open port ${HTTPS_PORT} in your firewall if needed"
+        if port_in_use 80; then
+          warn "Automatic HTTPS may fail while port 80 is taken (needed for certificate issuance)"
+        fi
+        return
+      fi
+      warn "Ports 8080/8443 are also in use — choose custom ports"
+      USE_CADDY=true
+      pick_free_port HTTP_PORT "HTTP port on this server (maps to Caddy :80)" "8080"
+      pick_free_port HTTPS_PORT "HTTPS port on this server (maps to Caddy :443)" "8443"
+      build_app_url
+      ok "Using ports ${HTTP_PORT} (HTTP) and ${HTTPS_PORT} (HTTPS)"
+      ok "Site URL: ${APP_URL}"
+      if [[ "$HTTP_PORT" != "80" ]]; then
+        warn "Automatic HTTPS may fail unless port 80 is free for certificate issuance"
+      fi
+      ;;
+    2|*)
+      USE_CADDY=true
+      pick_free_port HTTP_PORT "HTTP port on this server (maps to Caddy :80)" "8080"
+      pick_free_port HTTPS_PORT "HTTPS port on this server (maps to Caddy :443)" "8443"
+      build_app_url
+      ok "Using ports ${HTTP_PORT} (HTTP) and ${HTTPS_PORT} (HTTPS)"
+      ok "Site URL: ${APP_URL}"
+      if [[ "$HTTP_PORT" != "80" ]]; then
+        warn "Automatic HTTPS may fail unless port 80 is free for certificate issuance"
+      fi
+      ;;
+  esac
+}
+
 require_root() {
   if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
     fail "Please run as root: sudo bash install.sh"
@@ -217,7 +353,8 @@ run_questionnaire() {
     ask_into DOMAIN "Your domain" ""
   done
 
-  APP_URL="https://${DOMAIN}"
+  DOMAIN="${DOMAIN%%/*}"
+  DOMAIN="${DOMAIN%%:*}"
 
   tty_echo ""
   tty_echo "  ${BOLD}── Admin account ──${NC} ${DIM}(used to sign in at /login)${NC}"
@@ -294,6 +431,10 @@ NEXT_PUBLIC_APP_URL=${APP_URL}
 
 UPLOAD_DIR=./uploads
 LOG_LEVEL=info
+
+HTTP_PORT=${HTTP_PORT}
+HTTPS_PORT=${HTTPS_PORT}
+USE_CADDY=${USE_CADDY}
 ENV
 
   if [[ "$ENABLE_GATEWAY" == true ]]; then
@@ -321,12 +462,45 @@ ENV
 }
 
 write_caddyfile() {
+  if [[ "${USE_CADDY:-true}" != "true" ]]; then
+    ok "Skipped Caddy config (using external reverse proxy)"
+    return
+  fi
   cat >"$INSTALL_DIR/docker/caddy/Caddyfile" <<CADDY
 ${DOMAIN} {
 	reverse_proxy web:3000
 }
 CADDY
-  ok "HTTPS reverse proxy configured for ${DOMAIN}"
+  ok "HTTPS reverse proxy configured for ${DOMAIN} on ports ${HTTP_PORT}/${HTTPS_PORT}"
+}
+
+patch_env_file() {
+  local env_file="$INSTALL_DIR/.env"
+  [[ -f "$env_file" ]] || return
+  local tmp
+  tmp="$(mktemp)"
+  grep -v '^AUTH_URL=' "$env_file" | grep -v '^NEXT_PUBLIC_APP_URL=' | grep -v '^HTTP_PORT=' | grep -v '^HTTPS_PORT=' | grep -v '^USE_CADDY=' >"$tmp" || true
+  cat >>"$tmp" <<ENV
+AUTH_URL=${APP_URL}
+NEXT_PUBLIC_APP_URL=${APP_URL}
+HTTP_PORT=${HTTP_PORT}
+HTTPS_PORT=${HTTPS_PORT}
+USE_CADDY=${USE_CADDY}
+ENV
+  mv "$tmp" "$env_file"
+  chmod 600 "$env_file"
+  ok "Updated site URL and port settings in .env"
+}
+
+get_compose_profiles() {
+  local profiles=""
+  if [[ "${USE_CADDY:-true}" == "true" ]]; then
+    profiles="--profile caddy"
+  fi
+  if [[ "${ENABLE_GATEWAY:-false}" == "true" ]]; then
+    profiles="$profiles --profile gateway"
+  fi
+  printf '%s' "$profiles"
 }
 
 install_ctl() {
@@ -360,7 +534,7 @@ main() {
 
   step "Configuration"
   if [[ "$UPDATE_MODE" == true && -f "$INSTALL_DIR/.env" ]]; then
-    ok "Keeping existing .env"
+    ok "Keeping existing .env (will update URL/ports if changed)"
     if grep -q '^GAME_GATEWAY_URL=' "$INSTALL_DIR/.env"; then
       ENABLE_GATEWAY=true
     else
@@ -371,8 +545,20 @@ main() {
     APP_URL="${AUTH_URL:-https://localhost}"
     DOMAIN="${APP_URL#https://}"
     DOMAIN="${DOMAIN#http://}"
+    DOMAIN="${DOMAIN%%:*}"
+    HTTP_PORT="${HTTP_PORT:-80}"
+    HTTPS_PORT="${HTTPS_PORT:-443}"
+    USE_CADDY="${USE_CADDY:-true}"
   else
     run_questionnaire
+  fi
+
+  configure_networking
+
+  if [[ "$UPDATE_MODE" == true && -f "$INSTALL_DIR/.env" ]]; then
+    patch_env_file
+    write_caddyfile
+  else
     write_env_file
     write_caddyfile
   fi
@@ -405,13 +591,14 @@ main() {
   fi
 
   step "Starting ServerSpot"
-  local profiles="--profile caddy"
-  if [[ "$ENABLE_GATEWAY" == true ]]; then
-    profiles="$profiles --profile gateway"
-  fi
+  local profiles
+  profiles="$(get_compose_profiles)"
   # shellcheck disable=SC2086
   compose $profiles up -d
   ok "All services started (restart automatically on reboot)"
+  if [[ "${USE_CADDY:-true}" != "true" ]]; then
+    warn "Proxy web → 127.0.0.1:3000 in your existing reverse proxy (nginx/Coolify/etc.)"
+  fi
 
   step "Finishing up"
   install_ctl
@@ -438,7 +625,11 @@ main() {
   tty_echo "  ${DIM}serverspot restart${NC}  — restart all services"
   tty_echo ""
   tty_echo "  ${YELLOW}Make sure DNS for ${DOMAIN} points to this server's IP.${NC}"
-  tty_echo "  ${DIM}HTTPS certificates are issued automatically by Caddy.${NC}"
+  if [[ "${USE_CADDY:-true}" == "true" ]]; then
+    tty_echo "  ${DIM}HTTPS via Caddy on ports ${HTTP_PORT}/${HTTPS_PORT}.${NC}"
+  else
+    tty_echo "  ${DIM}Configure your reverse proxy to forward to 127.0.0.1:3000${NC}"
+  fi
   tty_echo ""
 }
 
