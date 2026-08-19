@@ -1,0 +1,26 @@
+{
+  "name": "@serverspot/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "@serverspot/config": "workspace:*",
+    "@serverspot/db": "workspace:*",
+    "@serverspot/email": "workspace:*",
+    "@serverspot/jobs": "workspace:*",
+    "@serverspot/observability": "workspace:*",
+    "@serverspot/store": "workspace:*"
+  },
+  "devDependencies": {
+    "@serverspot/tsconfig": "workspace:*",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

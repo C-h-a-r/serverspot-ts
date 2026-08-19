@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Players — {{ site.name }}</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="page">
+    <h1>Players</h1>
+    <div class="grid">
+      @foreach (items as player)
+        <a href="/players/{{ player.slug }}" class="card">
+          <h2>{{ player.name }}</h2>
+          @if (player.bio)
+            <p class="muted">{{ player.bio }}</p>
+          @endif
+        </a>
+      @endforeach
+    </div>
+  </main>
+  @include('assets/footer.html')
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vote — {{ site.name }}</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="page">
+    <h1>Vote for us</h1>
+    <p>Vote on the sites below, then claim your reward on the website.</p>
+
+    <section>
+      <h2>Vote sites</h2>
+      @foreach (sites as site)
+        <p><a href="{{ site.voteUrl }}" target="_blank" rel="noopener" class="btn">{{ site.name }}</a></p>
+      @endforeach
+    </section>
+
+    @if (topVoters)
+      <section>
+        <h2>Top voters</h2>
+        @foreach (topVoters as voter)
+          <p>{{ voter.username }} — {{ voter.streak }} day streak</p>
+        @endforeach
+      </section>
+    @endif
+  </main>
+  @include('assets/footer.html')
+</body>
+</html>

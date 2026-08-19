@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leaderboards — {{ site.name }}</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="page">
+    <h1>Leaderboards</h1>
+    <div class="grid">
+      @foreach (boards as board)
+        <a href="/leaderboards/{{ board.slug }}" class="card">
+          <h2>{{ board.name }}</h2>
+          @if (board.description)
+            <p class="muted">{{ board.description }}</p>
+          @endif
+          <p class="muted">Last sync: {{ board.lastSync }}</p>
+        </a>
+      @endforeach
+    </div>
+  </main>
+  @include('assets/footer.html')
+</body>
+</html>

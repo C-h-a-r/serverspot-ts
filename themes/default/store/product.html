@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>{{ item.name }} — {{ site.name }}</title>
+
+  @include('assets/header.html')
+
+</head>
+
+<body>
+
+  <main class="page">
+
+    <a href="/store" class="back">← Back to store</a>
+
+    <h1>{{ item.name }}</h1>
+
+    <p class="price">{{ item.price }}</p>
+
+    <p>{{ item.description }}</p>
+
+    <button class="btn add-to-cart" data-product-id="{{ item.id }}">Add to cart</button>
+
+    <p><a href="/store/checkout">View cart / Checkout</a></p>
+
+  </main>
+
+
+
+  <script>
+
+    document.querySelector('.add-to-cart')?.addEventListener('click', async function(e) {
+      const btn = e.currentTarget;
+
+      btn.disabled = true;
+
+      btn.textContent = 'Adding…';
+
+      try {
+
+        const res = await fetch('/api/store/cart', {
+
+          method: 'POST',
+
+          headers: { 'Content-Type': 'application/json' },
+
+          body: JSON.stringify({ productId: btn.dataset.productId, quantity: 1 }),
+
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || 'Failed');
+
+        btn.textContent = 'Added!';
+
+        setTimeout(function() {
+
+          btn.textContent = 'Add to cart';
+
+          btn.disabled = false;
+
+        }, 1500);
+
+      } catch (err) {
+
+        alert(err.message || 'Could not add to cart');
+
+        btn.textContent = 'Add to cart';
+
+        btn.disabled = false;
+
+      }
+
+    });
+
+  </script>
+
+  @include('assets/footer.html')
+
+</body>
+
+</html>
+

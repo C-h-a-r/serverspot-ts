@@ -1,0 +1,53 @@
+{
+  "name": "@serverspot/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "biome check .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@serverspot/auth": "workspace:*",
+    "@serverspot/config": "workspace:*",
+    "@serverspot/db": "workspace:*",
+    "@serverspot/observability": "workspace:*",
+    "@serverspot/permissions": "workspace:*",
+    "@serverspot/spot": "workspace:*",
+    "@serverspot/storage": "workspace:*",
+    "@serverspot/store": "workspace:*",
+    "@serverspot/forum": "workspace:*",
+    "@serverspot/support": "workspace:*",
+    "@serverspot/cms": "workspace:*",
+    "@serverspot/users": "workspace:*",
+    "@serverspot/game": "workspace:*",
+    "@serverspot/votes": "workspace:*",
+    "@serverspot/minecraft": "workspace:*",
+    "@serverspot/applications": "workspace:*",
+    "@serverspot/analytics": "workspace:*",
+    "@serverspot/developer": "workspace:*",
+    "@serverspot/discord": "workspace:*",
+    "@serverspot/payments": "workspace:*",
+    "@serverspot/ui": "workspace:*",
+    "better-auth": "^1.1.14",
+    "drizzle-orm": "^0.38.3",
+    "lucide-react": "^0.469.0",
+    "next": "^15.1.3",
+    "next-themes": "^0.4.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "sonner": "^1.7.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@serverspot/tsconfig": "workspace:*",
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.3"
+  }
+}

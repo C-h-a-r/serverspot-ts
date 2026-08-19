@@ -1,0 +1,1 @@
+{ "extends": "@serverspot/tsconfig/node.json", "include": ["src"] }

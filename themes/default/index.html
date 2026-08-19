@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ site.name }}</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="hero">
+    <h1>{{ config("hero_title") }}</h1>
+    <p class="subtitle">{{ config("hero_subtitle") }}</p>
+    @if (user)
+      <p class="welcome">Welcome back, {{ user.name }}!</p>
+      <div class="actions">
+        <a href="/profile" class="btn">My profile</a>
+        <a href="/admin" class="btn btn-secondary">Admin</a>
+      </div>
+    @else
+      <div class="actions">
+        <a href="/login" class="btn">Sign in</a>
+      </div>
+    @endif
+    @if (config("discord_url"))
+      <a href="{{ display_url(config('discord_url')) }}" class="discord-link" rel="noopener noreferrer">Join our Discord</a>
+    @endif
+  </main>
+  @include('assets/footer.html')
+</body>
+</html>

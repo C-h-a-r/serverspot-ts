@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blog — {{ site.name }}</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="page">
+    <h1>Blog</h1>
+    @foreach (items as post)
+      <a href="/blog/{{ post.slug }}" class="thread-row">
+        <span class="title">{{ post.title }}</span>
+        <span class="meta">{{ post.author }} · {{ post.excerpt }}</span>
+      </a>
+    @endforeach
+  </main>
+  @include('assets/footer.html')
+</body>
+</html>

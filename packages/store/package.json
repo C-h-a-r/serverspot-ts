@@ -1,0 +1,27 @@
+{
+  "name": "@serverspot/store",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@serverspot/db": "workspace:*",
+    "@serverspot/jobs": "workspace:*",
+    "@serverspot/payments": "workspace:*",
+    "@serverspot/utils": "workspace:*",
+    "drizzle-orm": "^0.38.3",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@serverspot/tsconfig": "workspace:*",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

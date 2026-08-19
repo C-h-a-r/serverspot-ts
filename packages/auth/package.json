@@ -1,0 +1,27 @@
+{
+  "name": "@serverspot/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./server": "./src/server.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "@serverspot/config": "workspace:*",
+    "@serverspot/db": "workspace:*",
+    "@serverspot/permissions": "workspace:*",
+    "argon2": "^0.41.1",
+    "better-auth": "^1.1.14",
+    "drizzle-orm": "^0.38.3"
+  },
+  "devDependencies": {
+    "@serverspot/tsconfig": "workspace:*",
+    "typescript": "^5.7.3"
+  }
+}

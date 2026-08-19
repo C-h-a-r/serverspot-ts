@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ user.name }} — {{ site.name }}</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="profile-page">
+    <section class="profile-card">
+      <div class="avatar">{{ user.name }}</div>
+      <h1>{{ user.name }}</h1>
+      <p class="email">{{ user.email }}</p>
+      <div class="actions">
+        <a href="/admin" class="btn">Admin dashboard</a>
+        <button type="button" id="logout-btn" class="btn btn-secondary">Sign out</button>
+      </div>
+    </section>
+
+    <section class="link-section">
+      <h2>Linked game accounts</h2>
+      @if (linkedAccounts)
+        @foreach (linkedAccounts as account)
+          <p>{{ account.platform }}: {{ account.username }} @if (account.verified)(verified)@endif</p>
+        @endforeach
+      @else
+        <p class="muted">No linked accounts yet.</p>
+      @endif
+
+      <h3>Link Minecraft account</h3>
+      <p class="muted">Run <code>/link</code> in-game, then enter the code below.</p>
+      <div class="link-form">
+        <input type="text" id="link-code" placeholder="Enter code" maxlength="12" />
+        <button type="button" class="btn" id="link-btn">Link account</button>
+      </div>
+      <p id="link-status" class="muted"></p>
+    </section>
+  </main>
+
+  <script>
+    document.getElementById('link-btn')?.addEventListener('click', async function() {
+      const code = document.getElementById('link-code')?.value?.trim();
+      const status = document.getElementById('link-status');
+      if (!code) return;
+      try {
+        const res = await fetch('/api/account/link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Link failed');
+        status.textContent = 'Linked ' + data.account.username + '!';
+        setTimeout(function() { window.location.reload(); }, 1000);
+      } catch (err) {
+        status.textContent = err.message || 'Link failed';
+      }
+    });
+  </script>
+  @include('assets/footer.html')
+</body>
+</html>

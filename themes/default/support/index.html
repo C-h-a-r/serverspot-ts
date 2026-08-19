@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Support — {{ site.name }}</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="page">
+    <h1>Support</h1>
+    <p class="subtitle">Help centre articles</p>
+    @foreach (articles as article)
+      <a href="/support/help/{{ article.slug }}" class="thread-row">
+        <span class="title">{{ article.title }}</span>
+        @if (article.category)
+          <span class="meta">{{ article.category }}</span>
+        @endif
+      </a>
+    @endforeach
+  </main>
+  @include('assets/footer.html')
+</body>
+</html>

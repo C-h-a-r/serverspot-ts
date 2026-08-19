@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ thread.title }} — Forum</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="page">
+    <a href="/forum" class="back">← Back to forum</a>
+    <h1>{{ thread.title }}</h1>
+    <p class="meta">by {{ thread.author }} in {{ thread.category }}</p>
+    @foreach (posts as post)
+      <article class="post">
+        <p class="post-meta">{{ post.author }}</p>
+        <div class="post-body">{{ post.body }}</div>
+      </article>
+    @endforeach
+  </main>
+  @include('assets/footer.html')
+</body>
+</html>

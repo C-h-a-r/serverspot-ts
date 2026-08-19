@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order confirmed — {{ site.name }}</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="page">
+    <h1>Thank you!</h1>
+    <p>Your order has been received.</p>
+    <p>Order ID: <code>{{ order.id }}</code></p>
+    <p>Status: {{ order.status }}</p>
+    <p class="price">Total: {{ order.total }}</p>
+
+    <section>
+      <h2>Items</h2>
+      @foreach (order.items as item)
+        <p>{{ item.quantity }}x {{ item.name }} — {{ item.price }}</p>
+      @endforeach
+    </section>
+
+    <a href="/store" class="btn">Continue shopping</a>
+  </main>
+  @include('assets/footer.html')
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Applications — {{ site.name }}</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="page">
+    <h1>Applications</h1>
+    <p>Apply to join our team or community roles.</p>
+
+    @if (submitted)
+      <p class="notice success">Your application was submitted successfully.</p>
+    @endif
+
+    <section>
+      <h2>Open forms</h2>
+      @foreach (forms as form)
+        <article class="card">
+          <h3>{{ form.name }}</h3>
+          @if (form.description)
+            <p>{{ form.description }}</p>
+          @endif
+          <p><a href="/applications/form/{{ form.slug }}" class="btn">Apply now</a></p>
+        </article>
+      @endforeach
+
+      @if (forms.length === 0)
+        <p>No application forms are open right now.</p>
+      @endif
+    </section>
+  </main>
+  @include('assets/footer.html')
+</body>
+</html>

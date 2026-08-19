@@ -1,0 +1,34 @@
+{
+  "options": [
+    {
+      "id": "accent_colour",
+      "type": "colour",
+      "label": "Accent colour",
+      "default": "#88d0f8"
+    },
+    {
+      "id": "hero_title",
+      "type": "text",
+      "label": "Hero title",
+      "default": "Welcome to ServerSpot"
+    },
+    {
+      "id": "hero_subtitle",
+      "type": "text",
+      "label": "Hero subtitle",
+      "default": "Everything you need to run your game server website"
+    },
+    {
+      "id": "discord_url",
+      "type": "link",
+      "label": "Discord URL",
+      "default": ""
+    },
+    {
+      "id": "hero_background",
+      "type": "image",
+      "label": "Hero background",
+      "default": ""
+    }
+  ]
+}

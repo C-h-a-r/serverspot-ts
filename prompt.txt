@@ -1,0 +1,2022 @@
+================================================================================
+SERVER SPOT — TYPESCRIPT FULL-STACK REBUILD PROMPT
+================================================================================
+
+You are rebuilding ServerSpot from scratch as a production-grade, self-hosted
+game server community platform. This document is the complete product and
+engineering specification. Treat it as the source of truth.
+
+ServerSpot is an all-in-one website + admin panel for game server networks
+(Minecraft-first, multi-game capable). It combines:
+
+  • A public storefront and community website
+  • A polished admin dashboard
+  • A custom Spot theme/templating system
+  • Deep game-server and Discord integrations
+  • Modular feature toggles (store, forum, support, blog, etc.)
+  • Self-hosted-first deployment
+
+Tagline direction:
+  "Everything you need to run your game server website — store, community,
+   support, and more."
+
+The existing Rust/Dioxus prototype defines PRODUCT SURFACE and UX INTENT.
+Your job is to implement it properly in TypeScript with real backend logic,
+not mock admin UI only.
+
+================================================================================
+SECTION 1 — REQUIRED TECH STACK
+================================================================================
+
+Use this stack unless there is a strong, documented reason to add a
+complementary package.
+
+CORE APP
+--------
+  next                  Main full-stack framework; SSR, routing, API routes,
+                        server components, server actions where appropriate
+  react                 UI library
+  react-dom             React DOM renderer
+  typescript            Type safety across the entire project
+  pnpm                  Package manager and workspaces
+  turbo                 Monorepo task orchestration
+
+UI / STYLING
+------------
+  tailwindcss           Utility-first styling
+  shadcn/ui             Copy-in UI components for admin dashboard
+  clsx                  Conditional class names
+  tailwind-merge        Safely merge Tailwind classes
+  lucide-react          Icons
+  class-variance-authority   Component variants (standard with shadcn)
+  next-themes           Admin light/dark mode
+  sonner                Toast notifications
+  vaul                  Drawers/sheets
+
+DATA / VALIDATION / ENV
+-----------------------
+  drizzle-orm           Database ORM and query layer
+  postgres              PostgreSQL driver
+  drizzle-kit           Schema migrations and DB tooling
+  zod                   Runtime validation for API payloads, forms, config,
+                        webhooks, job payloads
+  @t3-oss/env-nextjs    Typed and validated environment variables
+
+AUTH / SECURITY
+---------------
+  better-auth           Authentication, sessions, OAuth, account management
+  argon2                Secure password hashing
+  Rate limiting         PostgreSQL-first initially; design for Redis later
+
+PAYMENTS / COMMERCE
+-------------------
+  stripe                Official Stripe server SDK
+  PayPal REST/JS SDK    PayPal checkout and payment handling
+  Tebex integration     Optional headless checkout provider (first-class)
+
+EMAIL
+-----
+  nodemailer            SMTP email sending
+  @react-email/components   Transactional email templates in React
+
+FORMS / ADMIN UI DATA
+---------------------
+  react-hook-form       Complex client-side form handling
+  @hookform/resolvers   Connect React Hook Form to Zod
+  @tanstack/react-table Admin tables: users, orders, products, tickets
+  @tanstack/react-query Client-side fetching/cache for interactive admin UI
+  @tanstack/react-virtual   Virtualisation for large admin tables
+  nuqs                  Keep filters/search/pagination in URL query params
+  zustand               Lightweight client state: cart, builders, editors
+
+CONTENT / RICH TEXT / MARKDOWN
+------------------------------
+  @tiptap/react         Rich text editor (admin content)
+  @tiptap/starter-kit   Standard TipTap features
+  react-markdown        Render Markdown on public/admin surfaces
+  remark-gfm            GitHub-flavoured Markdown
+  sanitize-html         Sanitise user/admin-provided HTML
+
+MEDIA / UTILITIES
+-----------------
+  sharp                 Resize/compress/convert uploaded images
+  date-fns              Date/time utilities
+  uuid                  UUID generation, including UUIDv7 where useful
+  nanoid                Short random public IDs/tokens
+  slugify               SEO-friendly URL slugs
+
+REALTIME / INTEGRATIONS
+-----------------------
+  ws                    Lightweight WebSocket server/client for game servers
+  discord.js            Discord bot and Discord integrations
+
+LOGGING / OBSERVABILITY
+-----------------------
+  pino                  Fast structured logging
+  pino-pretty           Readable local development logs
+  OpenTelemetry         Optional later; design hooks now
+
+CHARTS / CLI / QUALITY
+----------------------
+  recharts              Admin dashboard charts
+  commander             CLI commands: setup, doctor, backup, migrate
+  @biomejs/biome        Formatter + linter
+  vitest                Unit/integration tests
+  @playwright/test      Browser/end-to-end testing
+  lefthook              Optional Git hooks for lint/typecheck/tests
+
+RECOMMENDED ADDITIONS
+---------------------
+  next-intl             i18n for App Router (admin + public metadata)
+  @sentry/nextjs         Error monitoring (optional)
+  openapi-typescript    Developer API typing (optional)
+  croner                Simple scheduled tasks if not using BullMQ yet
+
+OPTIONAL INFRASTRUCTURE LATER
+-----------------------------
+  bullmq                Robust background job queues
+  ioredis               Redis client for BullMQ/caching/rate limiting
+  OpenTelemetry packages   Tracing/observability
+  S3 SDK packages       S3/R2/MinIO storage backend
+
+================================================================================
+SECTION 2 — REQUIRED MONOREPO STRUCTURE
+================================================================================
+
+Structure the project EXACTLY like this. Do not invent a different layout
+unless a package truly has no home — document why before placing elsewhere.
+
+project-root/
+├─ apps/
+│  ├─ web/                 # Main Next.js app: storefront, admin, API, webhooks
+│  ├─ worker/              # Background jobs: fulfilment, email, retries, cleanup
+│  ├─ game-gateway/        # Optional: persistent game-server/WebSocket connections
+│  └─ cli/                 # Optional: setup, doctor, backup, restore, migrate
+│
+├─ packages/
+│  ├─ db/                  # Drizzle schema, migrations, DB client, repositories
+│  ├─ auth/                # Better Auth config, permissions, session helpers
+│  ├─ payments/            # Payment abstractions + Stripe/PayPal providers
+│  ├─ jobs/                # Queue types, job definitions, enqueue helpers
+│  ├─ game/                # Game adapter interfaces + shared game types
+│  ├─ minecraft/           # Minecraft-specific adapter/protocol logic
+│  ├─ discord/             # Discord integration logic
+│  ├─ email/               # Nodemailer + React Email templates
+│  ├─ storage/             # Local filesystem + optional S3 adapters
+│  ├─ cms/                 # Pages, navigation, content domain logic
+│  ├─ store/               # Products, carts, orders, coupons, fulfilment logic
+│  ├─ forum/               # Forum domain logic
+│  ├─ support/             # Tickets/helpdesk domain logic
+│  ├─ users/               # Profiles, linked identities, account domain logic
+│  ├─ permissions/         # RBAC/permission definitions and checks
+│  ├─ config/              # Env parsing, shared config, feature flags
+│  ├─ ui/                  # Shared React components / shadcn components
+│  ├─ spot/                # Spot template parser, renderer, sandbox (ADD THIS)
+│  ├─ types/               # Shared TS types that don't belong elsewhere
+│  ├─ utils/               # Small genuinely shared utilities
+│  └─ observability/       # Pino logger, optional OpenTelemetry setup
+│
+├─ plugins/
+│  ├─ minecraft/           # Optional installable plugin package
+│  ├─ discord/             # Optional integration plugin
+│  └─ example-plugin/      # Plugin SDK example
+│
+├─ tooling/
+│  ├─ biome/               # Shared Biome config
+│  ├─ typescript/          # Shared tsconfig bases
+│  └─ vitest/              # Shared test config
+│
+├─ docker/
+│  ├─ web.Dockerfile
+│  ├─ worker.Dockerfile
+│  ├─ gateway.Dockerfile
+│  └─ caddy/
+│     └─ Caddyfile
+│
+├─ scripts/
+│  ├─ bootstrap.ts
+│  ├─ backup.ts
+│  └─ release.ts
+│
+├─ themes/
+│  └─ default/             # Default Spot theme pack (can also live in packages/spot)
+│
+├─ docker-compose.yml
+├─ pnpm-workspace.yaml
+├─ turbo.json
+├─ package.json
+├─ tsconfig.json
+├─ biome.json
+├─ .env.example
+└─ README.md
+
+MONOREPO RULES
+--------------
+  • Domain logic lives in packages/*, NEVER deeply inside React components
+  • apps/web orchestrates requests/UI; it does NOT own business rules
+  • apps/worker and apps/game-gateway are first-class deployables
+  • Import via workspace packages: @serverspot/store, @serverspot/forum, etc.
+  • Avoid circular dependencies between packages
+  • Shared UI only in packages/ui
+  • Shared env/config only in packages/config
+  • Shared auth/RBAC in packages/auth + packages/permissions
+  • Spot engine in packages/spot
+  • Do not turn packages/utils into a junk drawer
+
+APP RESPONSIBILITIES
+--------------------
+
+apps/web
+  • Main Next.js application
+  • Public storefront/site (Spot-rendered for primary pages)
+  • Admin dashboard (React + shadcn/ui)
+  • API routes / server actions
+  • Webhook endpoints: Stripe, PayPal, vote sites, Discord interactions
+  • Auth routes via Better Auth
+  • Upload/asset endpoints
+  • Depends on domain packages; no duplicated business logic
+
+apps/worker
+  • Background processing service
+  • Uses packages/jobs definitions
+  • Handles: order fulfilment retries, email, webhook retries, scheduled
+    publishing, analytics aggregation, cleanup, vote callback processing
+  • PostgreSQL outbox/job table pattern initially
+  • BullMQ + Redis swappable later without rewriting job contracts
+
+apps/game-gateway
+  • Persistent game-server connectivity service
+  • Uses ws
+  • Handles: authenticated connections, command delivery, player verification,
+    account-link confirmation, server heartbeat, stat ingestion
+  • Speaks through packages/game and packages/minecraft
+
+apps/cli
+  • Commander-based CLI
+  • Commands: setup, doctor, migrate, seed, create-admin, backup, restore,
+    theme:scaffold
+  • Reuses domain services from packages
+
+PACKAGE RESPONSIBILITIES
+------------------------
+
+packages/db
+  Drizzle schema, migrations, DB client, repositories, seed helpers,
+  schema rollout/history tables
+
+packages/auth
+  Better Auth config, sessions, OAuth providers, account linking, staff auth
+
+packages/payments
+  Payment abstraction, Stripe, PayPal, checkout interfaces, webhook normalisation
+
+packages/jobs
+  Job types (zod), enqueue helpers, worker handler registry, retry policies
+
+packages/game
+  Game-agnostic interfaces: command delivery, verification, identity linking,
+  stat ingestion, online status. Adapter registry for future games.
+
+packages/minecraft
+  Minecraft-specific adapter, protocol conventions, plugin handshake, commands
+
+packages/discord
+  OAuth helpers, role sync, bot notifications, event formatting
+
+packages/email
+  Nodemailer transport, React Email templates, typed send helpers
+
+packages/storage
+  File storage abstraction, local FS default, optional S3/R2/MinIO later
+
+packages/cms
+  Pages, blog, navigation, homepage widgets, SEO metadata, scheduled publishing
+
+packages/store
+  Products, categories, carts, checkout, orders, coupons, gifts, fulfilment
+
+packages/forum
+  Categories, threads, posts, reactions, moderation, visibility rules
+
+packages/support
+  Tickets, messages, notes, departments, SLA, help articles, automation
+
+packages/users
+  Profiles, privacy, linked identities, badges, achievements hooks
+
+packages/permissions
+  Role definitions, permission constants, RBAC evaluation, guard utilities
+
+packages/config
+  @t3-oss/env-nextjs schemas, runtime config, feature flags, module toggles
+
+packages/ui
+  shadcn components, admin shell primitives, form/table/chart wrappers
+
+packages/spot
+  Spot parser, AST, renderer, sandbox, theme pack loader, schema config injection
+
+packages/types
+  Shared TS types only when they don't belong in a domain package
+
+packages/utils
+  Tiny shared helpers only
+
+packages/observability
+  Pino setup, request/job logging, optional OpenTelemetry bootstrap
+
+PLUGINS DIRECTORY
+-----------------
+  plugins/minecraft       Optional installable plugin
+  plugins/discord         Optional integration plugin
+  plugins/example-plugin  Plugin SDK example
+
+Implement a plugin SDK concept:
+  • event hooks
+  • module registration
+  • settings schema extension
+  • optional admin nav injection
+  • safe runtime boundaries
+
+TOOLING DIRECTORY
+-----------------
+  tooling/biome, tooling/typescript, tooling/vitest — shared configs
+
+DOCKER / DEPLOYMENT
+-------------------
+  docker/web.Dockerfile, worker.Dockerfile, gateway.Dockerfile
+  docker/caddy/Caddyfile
+  docker-compose.yml with: web, worker, postgres, optional redis,
+  optional game-gateway, optional caddy reverse proxy
+
+SCRIPTS DIRECTORY
+-----------------
+  scripts/bootstrap.ts, backup.ts, release.ts — operational scripts only
+
+================================================================================
+SECTION 3 — PRODUCT ARCHITECTURE
+================================================================================
+
+TWO DISTINCT APP SURFACES
+-------------------------
+
+1. PUBLIC SITE
+   • Theme-driven via Spot templates (NOT hardcoded React for primary pages)
+   • CSP-hardened
+   • SEO-friendly SSR
+   • Module routes only render when module is enabled
+   • Configurable route aliases per module (/blog vs /news, /votes vs /vote)
+   • Injected theme CSS variables from schema.json config
+   • Controlled theme JavaScript runtime
+
+2. ADMIN DASHBOARD
+   • shadcn/ui polished admin shell
+   • Sidebar + contextual subnav per module
+   • Section/module accent colours
+   • Dark-first, clean, flat surfaces — no gimmicky glows
+   • Accent colour similar to #88d0f8 (ServerSpot light blue)
+   • Fast filterable tables with nuqs URL state
+   • React Query for interactive views
+   • TipTap for rich content editing
+   • Command palette optional but recommended
+
+ARCHITECTURE LAYERS
+-------------------
+  Route/API layer (apps/web)
+    → Service layer (packages/*)
+      → Repository layer (packages/db)
+        → PostgreSQL
+
+  Background jobs (apps/worker)
+    → Job handlers (packages/jobs)
+      → Service layer (packages/*)
+
+  Game connections (apps/game-gateway)
+    → Game adapters (packages/game, packages/minecraft)
+
+  Public rendering (apps/web)
+    → Spot engine (packages/spot)
+      → Theme pack files (themes/default/)
+
+MODULE TOGGLE SYSTEM
+--------------------
+Every major feature is a module that can be enabled/disabled:
+  store, forum, support, blog, players, leaderboards, votes, applications,
+  analytics
+
+When disabled:
+  • Public routes return 404 or redirect
+  • Admin nav hides module
+  • API endpoints reject or hide module
+  • Webhooks/events for that module pause
+
+Store module settings in DB:
+  • modules table (enabled flag)
+  • global_settings / module_settings keyed by module
+  • Preserve concept from original SurrealDB schema
+
+================================================================================
+SECTION 4 — CORE PRODUCT MODULES (FULL SPEC)
+================================================================================
+
+Implement ALL modules below with public routes AND admin routes.
+Build REAL backend logic, not mock UI.
+
+--------------------------------------------------------------------------------
+4.1 DASHBOARD
+--------------------------------------------------------------------------------
+
+Admin routes:
+  /admin
+  /admin/activity
+
+Features:
+  • Cross-module KPI cards: revenue, open tickets, active players, new posts,
+    pending votes, open applications
+  • Recent activity feed (orders, tickets, forum posts, vote claims, apps)
+  • Module launcher cards linking to each enabled module
+  • Quick actions: create product, view open tickets, moderate forum
+  • System health indicators: worker queue depth, game-gateway connections,
+    failed webhooks, storage usage
+
+--------------------------------------------------------------------------------
+4.2 STORE
+--------------------------------------------------------------------------------
+
+Public routes:
+  /store
+  /store/product/[slug]
+  Cart/checkout flow
+
+Admin routes:
+  /admin/store
+  /admin/store/products
+  /admin/store/orders
+  /admin/store/settings
+
+Features:
+  PRODUCTS
+    • Types: ranks, items, bundles, subscriptions, cosmetics, perks
+    • Fields: name, slug, description (TipTap/HTML), price, sale price, currency,
+      category, featured, visible, giftable, require-online, stock, media gallery
+    • Server targeting: which game servers receive delivery
+    • Commands on purchase + revoke commands on refund/expiry
+    • Expiry days for timed ranks/perks
+
+  CATEGORIES
+    • Nested categories, visibility, sort order, accent/icon
+
+  CART & CHECKOUT
+    • Guest and logged-in checkout
+    • Stripe + PayPal
+    • Optional Tebex headless checkout
+    • Coupon codes, gift codes, creator/affiliate codes
+    • Tax display hooks (future)
+    • Order confirmation email
+
+  ORDERS
+    • Statuses: pending, paid, processing, fulfilled, partially_fulfilled,
+      refunded, failed, cancelled
+    • Order items, payment provider reference, metadata
+    • Manual refund support
+    • Fulfillment log per item
+
+  FULFILMENT
+    • Deliver to game server via game-gateway command queue
+    • Deliver Discord role via packages/discord
+    • Retry failed deliveries with exponential backoff
+    • Staff visibility into delivery status
+
+  ANALYTICS (store-scoped)
+    • Revenue, conversion, top products, refund rate
+
+  WEBHOOKS
+    • order.completed, order.refunded, order.fulfilled
+
+  SETTINGS
+    • Currency, payment providers enabled, Tebex store ID, checkout text,
+      terms URL, automatic fulfilment toggle
+
+--------------------------------------------------------------------------------
+4.3 FORUM
+--------------------------------------------------------------------------------
+
+Public routes:
+  /forum
+  /forum/thread/[slug]
+
+Admin routes:
+  /admin/forum
+  /admin/forum/categories
+  /admin/forum/posts
+  /admin/forum/moderation
+  /admin/forum/settings
+
+Features:
+  CATEGORIES
+    • Name, slug, description, icon, sort order
+    • Visibility: public, members-only, role-restricted, staff-only
+    • Permission requirements to view/post
+
+  THREADS & POSTS
+    • Thread: title, slug, author, category, pinned, locked, tags
+    • Posts: markdown body, author, edited_at, reactions
+    • Attachments (via packages/storage)
+    • @mentions with notification
+    • Quote/reply threading
+
+  MODERATION
+    • Report queue
+    • Actions: warn, delete, lock, pin, ban user from category
+    • Moderation log
+    • Staff-only categories
+
+  SETTINGS
+    • Reactions enabled, attachments enabled, max upload size, default sort
+
+--------------------------------------------------------------------------------
+4.4 SUPPORT
+--------------------------------------------------------------------------------
+
+Public routes:
+  /support
+  /support/ticket/[id]
+  /support/help (help centre index)
+  /support/help/[slug] (article)
+
+Admin routes:
+  /admin/support
+  /admin/support/tickets
+  /admin/support/help
+  /admin/support/automation
+  /admin/support/settings
+
+Features:
+  TICKETS
+    • Categories, priority (low/normal/high/urgent), department
+    • Status: open, awaiting_player, awaiting_staff, resolved, closed
+    • Assignment to staff member
+    • Player and staff messages (public vs internal notes)
+    • SLA timers and breach indicators
+    • Attachments
+    • Ticket history/audit
+
+  HELP CENTRE
+    • FAQ/articles with categories
+    • Markdown/TipTap content
+    • Search
+    • "Did this help?" feedback
+
+  AUTOMATION
+    • Rules: on ticket created → auto-assign, auto-tag, auto-reply
+    • Optional AI first-reply provider interface (stub implementation OK)
+    • Escalation rules
+
+  INTEGRATIONS
+    • Discord notification on new ticket / staff reply
+    • Email notifications
+
+  SETTINGS
+    • Departments, SLA defaults, allowed attachments, public categories
+
+--------------------------------------------------------------------------------
+4.5 BLOG / CONTENT (CMS)
+--------------------------------------------------------------------------------
+
+Public routes:
+  /blog or configurable alias /news
+  /blog/[slug]
+  Custom pages: /pages/[slug] or configurable
+
+Admin routes:
+  /admin/blog
+  /admin/blog/posts
+  /admin/blog/pages
+  /admin/blog/settings
+
+Features:
+  POSTS
+    • Title, slug, excerpt, body (TipTap), cover image
+    • Categories, tags, author
+    • Status: draft, scheduled, published, archived
+    • Scheduled publish datetime
+    • SEO: meta title, description, OG image
+    • Revision history
+
+  PAGES
+    • Static/custom pages
+    • Homepage widget blocks (hero, featured posts, server status, Discord CTA)
+
+  WORKFLOW
+    • Editorial approval optional
+    • Author vs editor permissions
+
+  SETTINGS
+    • Default public path (/blog vs /news)
+    • Posts per page, default author, RSS feed toggle
+
+--------------------------------------------------------------------------------
+4.6 PLAYERS
+--------------------------------------------------------------------------------
+
+Public routes:
+  /players
+  /players/[slug]
+
+Admin routes:
+  /admin/players
+  /admin/players/profiles
+  /admin/players/settings
+
+Features:
+  PROFILES
+    • Display name, slug, avatar, bio, banner
+    • Playtime, join date, last seen
+    • Ranks/badges/achievements display
+    • Linked game accounts
+    • Forum activity summary
+    • Leaderboard placements
+    • Privacy: public, members-only, private
+
+  LINKED ACCOUNTS
+    • Game username, UUID, platform, server/network
+    • Verification status
+    • Primary account designation
+
+  ADMIN
+    • Search/filter/export CSV
+    • Manual badge assignment
+    • Privacy override for staff
+
+  SETTINGS
+    • Profile fields enabled, leaderboard visibility, stats source
+
+--------------------------------------------------------------------------------
+4.7 LEADERBOARDS
+--------------------------------------------------------------------------------
+
+Public routes:
+  /leaderboards
+  /leaderboards/[slug]
+
+Admin routes:
+  /admin/leaderboards
+  /admin/leaderboards/rankings
+  /admin/leaderboards/settings
+
+Features:
+  BOARDS
+    • Name, slug, description, game, server scope
+    • Stat definition (kills, balance, playtime, custom)
+    • Sort direction, reset schedule (daily/weekly/seasonal/never)
+    • Display limit (top 10/50/100)
+
+  ENTRIES
+    • Player reference, value, rank, previous rank, delta
+    • Snapshot history for charts
+
+  DATA SOURCES
+    • Plugin/API push via game-gateway
+    • Manual CSV import
+    • Scheduled sync job
+
+  HEALTH
+    • Last sync time, stale data warnings, source status
+
+  SETTINGS
+    • Default boards, refresh interval, public visibility rules
+
+--------------------------------------------------------------------------------
+4.8 VOTE REWARDS
+--------------------------------------------------------------------------------
+
+Public routes:
+  /votes or configurable alias /vote
+  /votes/claim/[token]
+
+Admin routes:
+  /admin/votes
+  /admin/votes/rewards
+  /admin/votes/settings
+
+Features:
+  VOTE SITES
+    • Name, callback URL template, verification method (token/HMAC/IP)
+    • Enabled/disabled per site
+
+  REWARDS
+    • Per-site or global reward config
+    • Reward types: in-game commands, store credit, Discord role
+    • Cooldown between claims
+    • Streak bonuses
+
+  CLAIM FLOW
+    • Player clicks vote link → votes on external site → callback received →
+      pending claim created → player claims on site → reward delivered
+
+  ANTI-ABUSE
+    • Dedupe by player/site/time window
+    • IP logging (privacy-aware)
+    • Callback signature verification
+
+  LEADERBOARDS
+    • Top voters this month/all-time
+
+  WEBHOOKS
+    • vote.received, vote.claimed
+
+  SETTINGS
+    • Claim expiry, streak rules, public leaderboard toggle
+
+--------------------------------------------------------------------------------
+4.9 APPLICATIONS (STAFF RECRUITMENT)
+--------------------------------------------------------------------------------
+
+Public routes:
+  /applications or configurable alias /apply
+  /applications/form/[slug]
+
+Admin routes:
+  /admin/applications
+  /admin/applications/inbox
+  /admin/applications/settings
+
+Features:
+  FORMS
+    • Dynamic question builder: text, textarea, select, multi-select, URL,
+      file upload
+    • Required/optional, validation rules
+    • Open/closed state, deadline, max submissions
+
+  SUBMISSIONS
+    • Applicant info, answers, submitted_at
+    • Status: submitted, reviewing, accepted, denied, withdrawn
+
+  REVIEW WORKFLOW
+    • Assign reviewers
+    • Staff notes (internal)
+    • Staff voting (approve/deny/abstain)
+    • Decision history
+
+  NOTIFICATIONS
+    • Email on status change
+
+  SETTINGS
+    • Default form, notification recipients, anonymised review mode
+
+--------------------------------------------------------------------------------
+4.10 ANALYTICS
+--------------------------------------------------------------------------------
+
+Public route (optional shared view):
+  /analytics
+
+Admin routes:
+  /admin/analytics
+  /admin/analytics/website
+  /admin/analytics/community
+  /admin/analytics/gaming
+  /admin/analytics/settings
+
+Features:
+  WEBSITE
+    • Unique visitors, page views, bounce rate, avg session
+    • Traffic sources, popular pages, referrers
+    • Device/browser breakdown
+
+  COMMUNITY
+    • Registrations over time, active users
+    • Forum posts/threads, support tickets opened/resolved
+    • Vote claims, application submissions
+
+  GAMING
+    • Peak/average players (from game-gateway)
+    • Revenue vs player count correlation
+    • Vote activity vs player activity
+
+  REPORTS
+    • Scheduled email reports
+    • CSV export
+    • Date range filters
+
+  INTEGRATIONS
+    • Google Analytics setting (optional external tracking ID)
+
+  IMPLEMENTATION
+    • Store raw events in analytics_events table
+    • Aggregate via worker jobs into analytics_daily aggregates
+    • Recharts for dashboard visualisation
+
+--------------------------------------------------------------------------------
+4.11 SETTINGS (GLOBAL ADMIN)
+--------------------------------------------------------------------------------
+
+Admin routes:
+  /admin/settings/general
+  /admin/settings/auth
+  /admin/settings/linking
+  /admin/settings/connections
+  /admin/settings/profiles
+  /admin/settings/roles
+  /admin/settings/localisation
+  /admin/settings/theme
+  /admin/settings/theme/edit
+  /admin/settings/developer
+  /admin/settings/integrations
+  /admin/settings/security
+  /admin/settings/hosting
+
+GENERAL
+  • Site name, tagline, custom domain, subdomain
+  • Logo upload (max ~4MB), favicon upload (max ~2MB)
+  • Maintenance mode toggle + message
+  • Default locale, timezone
+
+AUTH
+  • Registration enabled, email verification required
+  • Password policy, 2FA enforcement level
+  • Session duration, max sessions per user
+
+LINKING (Account linking)
+  • In-game verification code length/expiry
+  • Allowed platforms (Minecraft, etc.)
+  • Auto-link on verified plugin response
+
+CONNECTIONS (OAuth)
+  • Discord, Steam, Microsoft, Google, GitHub, custom OAuth
+  • Per-provider: client ID/secret, enabled, login button text
+  • Role sync mappings
+
+PROFILES
+  • Which profile fields are editable
+  • Avatar upload rules
+  • Default privacy level
+
+ROLES & PERMISSIONS
+  • Role hierarchy (owner > admin > moderator > support > user)
+  • Custom roles
+  • Granular permissions:
+      forums.create, forums.moderate, forums.delete
+      tickets.view, tickets.manage, tickets.assign
+      news.publish, news.edit, news.delete
+      store.manage, store.orders, store.refund
+      settings.manage, theme.edit, users.manage
+      analytics.view, applications.review, votes.manage
+      developer.api, developer.webhooks
+  • Role assignment UI
+
+LOCALISATION
+  • Enabled languages (en, de, es, fr, etc.)
+  • Translation key management
+  • Import/export translation files
+  • Currency list, default currency
+  • Date/time format preferences
+  • RTL locale support
+
+THEME
+  • Visual config panel from schema.json
+  • Theme pack selector (future multi-theme)
+  • Link to theme file editor
+
+THEME EDITOR
+  • File tree browser
+  • Syntax highlighting: Spot, HTML, CSS, JS, JSON
+  • Create/rename/delete files and folders
+  • Safe writes with validation
+  • Preview mode before publish
+  • Required files cannot be deleted
+
+DEVELOPER
+  • API keys with scopes
+  • Webhook endpoints with signing secret
+  • Event subscriptions
+  • API usage logs
+  • OpenAPI docs at /api/docs or /developer/docs
+  • Rate limits per API key
+
+INTEGRATIONS
+  • Discord: bot token, guild ID, role mappings, notification channels
+  • Tebex: store ID, secret key
+  • Google Analytics: tracking ID
+  • Tawk.to or live chat embed (optional)
+  • Vote site presets
+
+SECURITY
+  • Force 2FA for staff
+  • CAPTCHA on registration/login (provider interface)
+  • Cookie consent banner config
+  • IP allowlist for admin (optional)
+  • Audit log viewer
+
+HOSTING
+  • Self-hosted info panel
+  • Backup schedule settings (UI for future managed mode)
+  • Storage usage, DB size, worker health
+
+--------------------------------------------------------------------------------
+4.12 ACCOUNT (LOGGED-IN STAFF)
+--------------------------------------------------------------------------------
+
+Admin route:
+  /admin/account
+
+Features:
+  • Staff profile edit
+  • Password change
+  • 2FA setup
+  • Active sessions list + revoke
+  • Notification preferences
+  • API keys (if permitted)
+
+================================================================================
+SECTION 5 — SPOT THEME SYSTEM (CRITICAL DIFFERENTIATOR)
+================================================================================
+
+Spot is a Blade-like HTML template language for the PUBLIC site.
+Implement in packages/spot.
+
+THEME PACK STRUCTURE
+--------------------
+themes/default/
+  schema.json
+  index.html
+  login.html
+  profile.html
+  styles.css
+  scripts.js
+  assets/
+    header.html
+    footer.html
+    rail.html
+    partials/
+    utils.css
+  store/
+    index.html
+    product.html
+    styles.css
+    scripts.js
+  forum/
+    index.html
+    thread.html
+    styles.css
+  support/
+    index.html
+    ticket.html
+    styles.css
+  blog/
+    index.html
+    post.html
+    styles.css
+  players/
+    index.html
+    profile.html
+    styles.css
+  leaderboards/
+    index.html
+    board.html
+    styles.css
+  votes/
+    index.html
+    claim.html
+    styles.css
+  applications/
+    index.html
+    form.html
+    styles.css
+  analytics/
+    index.html
+    styles.css
+
+SPOT SYNTAX
+-----------
+  {{ expr }}              Escaped interpolation
+  {!! expr !!}            Raw HTML (must pass sanitization)
+  @if (cond) ... @endif
+  @elseif (cond)
+  @else
+  @foreach (collection as item) ... @endforeach
+  @include('path/to/partial')
+
+EXPRESSIONS
+-----------
+  • Dot paths: user.name, item.price
+  • Literals: strings, numbers, booleans
+  • not expr
+  • config("option_id")        Read theme schema config value
+  • display_url(config("discord_url"))   Sanitised URL output
+  • Comparison: ==, !=, >, <, >=, <=
+  • Logical: and, or
+  • Filters/functions as needed (keep minimal in v1)
+
+TEMPLATE CONTEXT
+----------------
+Server-side context objects passed per page, e.g.:
+  site        { name, logo_url, favicon_url, ... }
+  user        { id, name, avatar, roles, ... } or null
+  config      Theme config values from schema
+  items       Collection for list pages
+  item        Single entity for detail pages
+  boards, threads, products, tickets, etc.
+
+Rendering pipeline:
+  1. Load theme pack for active theme
+  2. Resolve template file for route
+  3. Build context from service layer
+  4. Parse Spot → AST
+  5. Render AST → HTML string
+  6. Inject CSS variables from config
+  7. Attach CSP headers
+  8. Return SSR response
+
+SCHEMA.JSON
+-----------
+Defines customizable theme options for admin visual config panel:
+
+  {
+    "options": [
+      { "id": "accent_colour", "type": "colour", "label": "Accent colour",
+        "default": "#88d0f8" },
+      { "id": "hero_title", "type": "text", "label": "Hero title",
+        "default": "Welcome" },
+      { "id": "discord_url", "type": "link", "label": "Discord URL",
+        "default": "" },
+      { "id": "hero_background", "type": "image", "label": "Hero background",
+        "default": "" }
+    ]
+  }
+
+Option types: text, colour, image, link
+
+Persist values in DB (theme_config_values table).
+Inject as CSS custom properties:
+  :root {
+    --config-accent-colour: #88d0f8;
+    ...
+  }
+
+Image uploads stored via packages/storage, served at controlled URL.
+
+THEME JAVASCRIPT
+----------------
+  • Allowlisted files only:
+      {theme}/scripts.js
+      {theme}/{feature}/scripts.js
+  • Served via /theme-runtime/[feature]/scripts.js
+  • Wrapped/sandboxed — no eval, restricted globals
+  • Dispatches spot:page-load custom DOM event after hydration
+
+SECURITY SANDBOX (MANDATORY)
+----------------------------
+  • CSP on all public Spot-rendered pages
+  • Forbidden HTML tags: script (inline), iframe (unless allowlisted), object,
+    embed, form action to external, etc.
+  • Forbidden attributes: on*, javascript: URLs
+  • URL sanitization on all href/src
+  • CSS sanitization (no expression(), no @import external, etc.)
+  • HTML sanitization on {!! !!} blocks
+  • Max theme file size: 512KB per file
+  • Max @include depth: 16
+  • Max @foreach items: 250
+  • Path traversal prevention in theme editor
+  • Theme editor requires admin auth + theme.edit permission
+  • Required theme files list — cannot delete
+
+THEME EDITOR (ADMIN)
+--------------------
+  /admin/settings/theme/edit
+
+  Features:
+    • File tree sidebar (folders + files)
+    • Code editor with syntax highlighting
+    • Tabs for open files
+    • Save with validation
+    • Create file/folder
+    • Rename/delete (except required files)
+    • Preview in new tab/window
+    • Schema config panel alongside code editor
+
+DEFAULT THEME DESIGN
+--------------------
+  • Clean dark aesthetic matching ServerSpot admin-reskin direction
+  • Background: #0B0B0D
+  • Cards/surfaces: #101013
+  • Accent: #88d0f8
+  • Flat colours, subtle borders, no glows/gradients unless config-driven
+  • Responsive, mobile-friendly
+  • Font: modern sans-serif (Inter or similar)
+
+================================================================================
+SECTION 6 — AUTH & PERMISSIONS
+================================================================================
+
+Use better-auth with:
+
+  EMAIL/PASSWORD
+    • Registration (toggleable)
+    • Email verification
+    • Password reset
+    • Password change
+    • argon2 hashing
+
+  OAUTH PROVIDERS
+    • Discord (priority — game server communities)
+    • Steam
+    • Microsoft
+    • Google
+    • GitHub
+    • Custom OAuth2 provider config
+
+  SESSIONS
+    • Secure HTTP-only cookies
+    • Session list + revoke in /admin/account
+    • Staff session timeout configurable
+
+  2FA
+    • TOTP (optional, enforceable for staff)
+
+  ACCOUNT LINKING
+    • Link OAuth accounts to existing email account
+    • Link game accounts via verification codes:
+        1. Player runs /link on game server
+        2. Server generates code, sends to game-gateway
+        3. Player enters code on website
+        4. Account linked in packages/users
+
+RBAC
+----
+  roles table: id, name, slug, level, colour, is_system
+  permissions table: id, slug, description, module
+  role_permissions: role_id, permission_id
+  user_roles: user_id, role_id
+
+  Permission check middleware for:
+    • Admin routes (Next.js middleware)
+    • API routes
+    • Server actions
+
+  Helper: requirePermission('store.manage')
+  Helper: requireAnyPermission(['forums.moderate', 'forums.delete'])
+
+AUDIT LOG
+---------
+  audit_logs: id, user_id, action, resource_type, resource_id, metadata (jsonb),
+              ip_address, created_at
+
+  Log: settings changes, role changes, refunds, bans, theme edits, API key
+  creation, webhook changes
+
+================================================================================
+SECTION 7 — DATABASE SCHEMA GUIDANCE
+================================================================================
+
+Use Drizzle ORM + PostgreSQL.
+
+CORE TABLES
+-----------
+  users
+  sessions (or managed by better-auth)
+  accounts (OAuth links — or better-auth tables)
+  verification_tokens
+
+  roles
+  permissions
+  role_permissions
+  user_roles
+
+  modules
+  global_settings
+  module_settings
+
+  audit_logs
+  notifications
+
+  theme_packs
+  theme_files
+  theme_config_values
+
+  uploaded_assets (logo, favicon, theme images, attachments)
+
+STORE
+-----
+  store_categories
+  store_products
+  store_product_media
+  store_product_commands
+  store_carts
+  store_cart_items
+  store_orders
+  store_order_items
+  store_order_fulfillments
+  store_coupons
+  store_gift_codes
+  store_creator_codes
+
+FORUM
+-----
+  forum_categories
+  forum_threads
+  forum_posts
+  forum_post_reactions
+  forum_reports
+  forum_moderation_actions
+
+SUPPORT
+-------
+  support_departments
+  support_categories
+  support_tickets
+  support_ticket_messages
+  support_help_articles
+  support_help_categories
+  support_automation_rules
+
+CMS
+---
+  cms_posts
+  cms_post_revisions
+  cms_pages
+  cms_categories
+  cms_tags
+  cms_post_tags
+
+USERS / PLAYERS
+---------------
+  user_profiles
+  user_linked_accounts
+  user_badges
+  user_achievements
+  user_privacy_settings
+
+LEADERBOARDS
+------------
+  leaderboard_boards
+  leaderboard_entries
+  leaderboard_snapshots
+  leaderboard_data_sources
+
+VOTES
+-----
+  vote_sites
+  vote_callbacks
+  vote_pending_claims
+  vote_claims
+  vote_rewards
+  vote_streaks
+
+APPLICATIONS
+------------
+  application_forms
+  application_questions
+  application_submissions
+  application_answers
+  application_reviews
+  application_votes
+
+ANALYTICS
+---------
+  analytics_events (raw)
+  analytics_daily_aggregates
+
+DEVELOPER
+---------
+  api_keys
+  api_key_usage_logs
+  webhooks
+  webhook_deliveries
+  webhook_events
+
+JOBS
+----
+  job_outbox (id, type, payload jsonb, status, attempts, scheduled_at,
+              processed_at, error)
+
+EMAIL
+-----
+  email_outbox (id, template, to, payload jsonb, status, sent_at, error)
+
+SCHEMA ROLLOUT
+--------------
+  schema_rollouts (id, name, checksum, status, applied_at, error)
+  Track migration history beyond drizzle-kit migrations if needed
+
+INDEXING
+--------
+  Index all foreign keys, slugs (unique per scope), status fields used in
+  filters, created_at for time-range queries.
+
+SOFT DELETES
+------------
+  Use deleted_at on: products, posts, threads, tickets, users (optional),
+  help articles, application forms
+
+UUID STRATEGY
+-------------
+  Internal IDs: UUIDv7 (time-sortable) or bigserial — pick one and be consistent
+  Public-facing slugs for SEO routes
+  nanoid for verification codes, claim tokens, API key prefixes
+
+================================================================================
+SECTION 8 — INTEGRATIONS (DETAILED)
+================================================================================
+
+DISCORD (packages/discord)
+----------------------------
+  • OAuth login/signup
+  • Link existing account
+  • Role sync triggers:
+      - order.completed → assign customer role
+      - vote.claimed → assign voter role
+      - application.accepted → assign staff role
+  • Bot notifications:
+      - new order (staff channel)
+      - new ticket (support channel)
+      - vote milestone (optional)
+  • Slash commands optional later
+  • Configurable per-guild
+
+GAME SERVERS (packages/game + apps/game-gateway)
+------------------------------------------------
+  Connection flow:
+    1. Server admin installs plugin (plugins/minecraft)
+    2. Plugin connects to game-gateway with API key
+    3. Gateway authenticates, registers server
+    4. Gateway maintains persistent WebSocket
+
+  Message types:
+    • SERVER_HELLO / SERVER_HEARTBEAT
+    • COMMAND_EXECUTE { commands[], player_uuid, order_id }
+    • COMMAND_RESULT { success, output, order_id }
+    • PLAYER_VERIFY { code, player_uuid, username }
+    • STATS_PUSH { board_id, entries[] }
+    • PLAYER_ONLINE { count, max }
+
+  Security:
+    • API key per server, rotatable
+    • HMAC signed messages optional
+    • Replay protection via nonce/timestamp
+
+STRIPE (packages/payments)
+--------------------------
+  • Checkout Sessions or Payment Intents
+  • Webhook: checkout.session.completed, charge.refunded
+  • Verify webhook signature
+  • Map to internal order model
+
+PAYPAL (packages/payments)
+--------------------------
+  • PayPal JS SDK on frontend
+  • Server-side order creation + capture
+  • Webhook verification
+
+TEBEX (optional)
+----------------
+  • Headless checkout integration
+  • Map Tebex packages to internal products OR use as payment-only gateway
+  • Webhook for payment confirmation
+
+VOTE SITES
+----------
+  Common Minecraft vote site callback patterns:
+    • GET callback with username + token + signature
+    • POST JSON callback
+  Implement per-site adapter in packages/store or packages/votes
+  Normalize to internal vote_callbacks table
+
+GOOGLE ANALYTICS
+----------------
+  • Optional GA4 tracking ID in settings
+  • Inject gtag script in Spot theme header partial when configured
+
+WEBHOOKS (outbound, developer platform)
+---------------------------------------
+  • User registers webhook URL + secret + event subscriptions
+  • On event: enqueue delivery job
+  • Sign payload: HMAC-SHA256(secret, body)
+  • Retry with exponential backoff (packages/jobs)
+  • Delivery log in webhook_deliveries
+  • Admin UI to view/retry failed deliveries
+
+PUBLIC API
+----------
+  REST API at /api/v1/*
+  Auth: Bearer API key with scopes
+  Endpoints (minimum):
+    GET  /api/v1/orders
+    GET  /api/v1/orders/:id
+    GET  /api/v1/products
+    GET  /api/v1/users/:id
+    GET  /api/v1/tickets
+    POST /api/v1/webhooks/test
+  OpenAPI spec generated from zod schemas or manual spec file
+
+================================================================================
+SECTION 9 — PUBLIC ROUTES (COMPLETE MAP)
+================================================================================
+
+All routes respect module enable/disable and configurable aliases.
+
+  GET  /                              Home (Spot)
+  GET  /login                         Login
+  GET  /profile                       User profile (auth required)
+  GET  /forum                         Forum index
+  GET  /forum/thread/[slug]           Thread detail
+  GET  /store                         Store catalog
+  GET  /store/product/[slug]          Product detail
+  POST /store/cart                    Add to cart (or API route)
+  GET  /store/checkout                Checkout page
+  POST /store/checkout                Process checkout
+  GET  /support                       Support portal
+  GET  /support/ticket/[id]           Ticket detail (auth)
+  GET  /support/help                  Help centre
+  GET  /support/help/[slug]           Help article
+  GET  /blog                          Blog index (alias: /news)
+  GET  /blog/[slug]                   Blog post
+  GET  /pages/[slug]                  Custom CMS page
+  GET  /players                       Player directory
+  GET  /players/[slug]                Player profile
+  GET  /leaderboards                  Leaderboard index
+  GET  /leaderboards/[slug]           Board detail
+  GET  /votes                         Vote links (alias: /vote)
+  GET  /votes/claim/[token]           Claim reward
+  GET  /applications                  Application portal (alias: /apply)
+  GET  /applications/form/[slug]      Application form
+  POST /applications/form/[slug]      Submit application
+  GET  /analytics                     Public analytics (if enabled)
+
+  GET  /uploads/site-logo             Site logo asset
+  GET  /uploads/site-favicon          Site favicon asset
+  GET  /uploads/theme-config/[id]     Theme config image asset
+  GET  /theme-runtime/[feature]/scripts.js   Theme JavaScript
+
+  POST /api/webhooks/stripe           Stripe webhook
+  POST /api/webhooks/paypal           PayPal webhook
+  POST /api/webhooks/vote/[site]        Vote site callback
+  POST /api/webhooks/tebex             Tebex webhook (optional)
+  *    /api/auth/*                     Better Auth routes
+  *    /api/v1/*                       Public API
+
+================================================================================
+SECTION 10 — ADMIN ROUTES (COMPLETE MAP)
+================================================================================
+
+All under /admin, auth + permission required.
+
+  /admin                              Dashboard
+  /admin/activity                     Activity feed
+
+  /admin/store                        Store overview
+  /admin/store/products               Product list
+  /admin/store/products/new           Create product
+  /admin/store/products/[id]          Edit product
+  /admin/store/orders                 Order list
+  /admin/store/orders/[id]            Order detail
+  /admin/store/settings               Store settings
+
+  /admin/forum                        Forum overview
+  /admin/forum/categories             Categories
+  /admin/forum/posts                  Threads/posts list
+  /admin/forum/moderation             Moderation queue
+  /admin/forum/settings               Forum settings
+
+  /admin/support                      Support overview
+  /admin/support/tickets              Ticket list
+  /admin/support/tickets/[id]         Ticket detail
+  /admin/support/help                 Help centre manager
+  /admin/support/automation           Automation rules
+  /admin/support/settings             Support settings
+
+  /admin/blog                         Blog overview
+  /admin/blog/posts                   Post list
+  /admin/blog/posts/new               Create post
+  /admin/blog/posts/[id]              Edit post
+  /admin/blog/pages                   Custom pages
+  /admin/blog/settings                Blog settings
+
+  /admin/players                      Players overview
+  /admin/players/profiles             Profile list
+  /admin/players/profiles/[id]        Profile detail
+  /admin/players/settings             Player settings
+
+  /admin/leaderboards                 Leaderboards overview
+  /admin/leaderboards/rankings        Board management
+  /admin/leaderboards/rankings/[id]   Board entries
+  /admin/leaderboards/settings        Leaderboard settings
+
+  /admin/votes                        Votes overview
+  /admin/votes/rewards                Reward config
+  /admin/votes/settings               Vote settings
+
+  /admin/applications                 Applications overview
+  /admin/applications/inbox           Submission inbox
+  /admin/applications/inbox/[id]      Submission detail
+  /admin/applications/settings        Application settings
+
+  /admin/analytics                    Analytics overview
+  /admin/analytics/website            Website analytics
+  /admin/analytics/community          Community analytics
+  /admin/analytics/gaming             Gaming analytics
+  /admin/analytics/settings           Analytics settings
+
+  /admin/settings/general
+  /admin/settings/auth
+  /admin/settings/linking
+  /admin/settings/connections
+  /admin/settings/profiles
+  /admin/settings/roles
+  /admin/settings/localisation
+  /admin/settings/theme
+  /admin/settings/theme/edit
+  /admin/settings/developer
+  /admin/settings/integrations
+  /admin/settings/security
+  /admin/settings/hosting
+
+  /admin/account                      Staff account settings
+
+================================================================================
+SECTION 11 — ADMIN UX REQUIREMENTS
+================================================================================
+
+DESIGN
+  • Dark-first admin dashboard
+  • Background: #0B0B0D, cards: #101013, borders: #2a2a32
+  • Accent: #88d0f8 (ServerSpot blue)
+  • Typography: clean sans-serif (Inter, Outfit, or similar)
+  • Border radius: ~0.65rem buttons, ~0.9rem cards
+  • Flat colours, no glows, no excessive gradients
+  • Module accent colours optional per section (store=green-ish, forum=purple,
+    support=orange, etc.) but keep subtle
+
+SHELL
+  • Collapsible sidebar with module icons
+  • Subnav appears contextually per module
+  • Top bar: search, notifications bell, user menu
+  • Breadcrumbs on all admin pages
+  • Mobile-responsive (sidebar becomes drawer)
+
+TABLES (TanStack Table)
+  • All list pages: search, column sort, filters, pagination
+  • Filters sync to URL via nuqs
+  • Bulk actions where appropriate (delete, publish, assign)
+  • Row actions dropdown
+  • Empty states with helpful CTAs
+  • Loading skeletons
+  • Virtualisation for large datasets
+
+FORMS (React Hook Form + Zod)
+  • Inline validation
+  • Server-side validation mirrors client schemas
+  • Unsaved changes warning on navigation
+  • Sectioned forms for complex entities (products, settings)
+
+NOTIFICATIONS
+  • In-app notification center (bell icon)
+  • Toast for action feedback (sonner)
+  • Types: order, ticket, application, system
+
+COMMAND PALETTE (optional but recommended)
+  • Cmd+K quick navigation
+  • Search pages, users, orders, tickets
+
+EMPTY / ERROR STATES
+  • Every list page has empty state
+  • 404/403/500 pages styled consistently
+  • Form error summary
+
+================================================================================
+SECTION 12 — BACKGROUND JOBS
+================================================================================
+
+apps/worker consumes jobs from packages/jobs.
+
+JOB TYPES (minimum)
+  email.send
+  order.fulfill
+  order.fulfill.retry
+  webhook.deliver
+  webhook.deliver.retry
+  vote.callback.process
+  vote.reward.deliver
+  blog.publish.scheduled
+  analytics.aggregate.daily
+  leaderboard.sync
+  discord.role.sync
+  cleanup.expired_tokens
+  cleanup.old_analytics_events
+  backup.create (future)
+
+OUTBOX PATTERN
+  1. Business logic writes to job_outbox in same DB transaction
+  2. Worker polls outbox (SELECT FOR UPDATE SKIP LOCKED)
+  3. Process job, mark complete or increment attempts
+  4. Dead letter after N attempts
+
+RETRY POLICY
+  • Exponential backoff: 1m, 5m, 15m, 1h, 4h
+  • Max 5 attempts default
+  • Admin UI to view/retry dead letters
+
+FUTURE: BullMQ + Redis
+  • Same job type definitions
+  • Swap outbox poller for BullMQ consumer
+  • No business logic changes
+
+================================================================================
+SECTION 13 — EMAIL TEMPLATES
+================================================================================
+
+Use @react-email/components in packages/email.
+
+TEMPLATES (minimum)
+  verify-email           Email verification link
+  reset-password         Password reset link
+  order-receipt          Order confirmation with items
+  order-refund           Refund notification
+  ticket-created         New ticket confirmation to player
+  ticket-reply           Staff reply notification to player
+  ticket-assigned        Staff assignment notification
+  application-received   Submission confirmation
+  application-status     Status change (accepted/denied)
+  staff-invite           Invite staff member
+  vote-claim-ready       Vote reward ready to claim
+  magic-link             If magic link auth added later
+
+All templates:
+  • Responsive HTML
+  • Plain-text fallback
+  • Site branding (logo, name, accent colour)
+  • Unsubscribe link where appropriate
+
+================================================================================
+SECTION 14 — INTERNATIONALISATION
+================================================================================
+
+Use next-intl or equivalent.
+
+ADMIN-MANAGED
+  • Enable/disable languages in settings
+  • Translation key editor (or file import/export)
+  • Fallback chain: user locale → site default → en
+
+USER-FACING
+  • Locale switcher on public site (Spot partial)
+  • User preference stored in profile
+  • Accept-Language header fallback
+
+ADMIN UI
+  • Admin dashboard translatable (start with English, structure for more)
+
+FORMATTING
+  • date-fns with locale for dates
+  • Currency formatting per site currency setting
+  • Number formatting
+
+RTL
+  • Design admin UI to support RTL locales (Arabic, Hebrew)
+  • Spot themes should respect dir="rtl" when configured
+
+TRANSLATION FILES
+  • JSON or FTL format in packages/config or dedicated i18n package
+  • Import/export in admin localisation settings
+
+================================================================================
+SECTION 15 — SECURITY REQUIREMENTS (MANDATORY)
+================================================================================
+
+  • argon2 password hashing (never bcrypt for new passwords)
+  • Secure session cookies: HttpOnly, Secure, SameSite=Lax/Strict
+  • CSRF protection on state-changing forms
+  • RBAC on every admin route and API endpoint
+  • Zod validation on every input boundary
+  • HTML sanitization: sanitize-html on all user content
+  • Markdown: render then sanitize, or use safe renderer
+  • Upload validation: MIME type, size limits, sharp metadata verify
+  • Path traversal prevention in theme editor and storage
+  • Rate limiting:
+      - /api/auth/* login/register: 5/min per IP
+      - /api/webhooks/vote/*: 60/min per site
+      - /api/v1/*: per API key limits
+      - Public forms: 10/min per IP
+  • Webhook signature verification (Stripe, PayPal, vote sites)
+  • API key hashing (store hash, show prefix only)
+  • Secrets never in client bundle (@t3-oss/env-nextjs server vars)
+  • CSP on public pages
+  • Audit log for sensitive actions
+  • No SQL injection (parameterised queries via Drizzle)
+  • No SSRF in webhook test endpoint (allowlist URLs or disable in prod)
+
+================================================================================
+SECTION 16 — TESTING REQUIREMENTS
+================================================================================
+
+VITEST (unit/integration)
+  packages/spot:     parser, renderer, sandbox, include depth, foreach limits
+  packages/permissions: RBAC evaluation
+  packages/payments:  webhook normalisation
+  packages/store:     order state machine, coupon validation
+  packages/votes:     callback dedupe, claim flow
+  packages/jobs:      retry policy, outbox processing
+  packages/auth:      permission guards
+
+PLAYWRIGHT (e2e)
+  • Admin login flow
+  • Create product → checkout (Stripe test mode) → order appears
+  • Create forum thread → reply
+  • Submit support ticket → staff reply
+  • Submit application → staff review
+  • Theme config change reflects on public home page
+  • Vote callback → claim flow
+  • RBAC: moderator cannot access settings
+
+CI
+  • turbo run lint test build on PR
+  • lefthook pre-commit: biome check, typecheck
+
+================================================================================
+SECTION 17 — CLI COMMANDS
+================================================================================
+
+apps/cli using commander:
+
+  serverspot setup
+    Interactive first-run setup: env, DB, admin user, default theme
+
+  serverspot doctor
+    Check: DB connection, Redis (if configured), storage writable,
+    game-gateway reachable, email SMTP test, required env vars
+
+  serverspot migrate
+    Run drizzle-kit migrations
+
+  serverspot seed
+    Seed demo data (optional flag)
+
+  serverspot create-admin
+    Create admin user interactively
+
+  serverspot backup
+    pg_dump + theme files + uploads → tarball
+
+  serverspot restore
+    Restore from backup tarball
+
+  serverspot theme:scaffold <name>
+    Create new theme pack from template
+
+  serverspot keys:rotate
+    Rotate game-server API keys (future)
+
+================================================================================
+SECTION 18 — DOCKER / SELF-HOSTED DEPLOYMENT
+================================================================================
+
+docker-compose.yml services:
+
+  web
+    Build: docker/web.Dockerfile
+    Ports: 3000
+    Env: DATABASE_URL, AUTH_SECRET, STRIPE_*, etc.
+    Depends: postgres
+
+  worker
+    Build: docker/worker.Dockerfile
+    Depends: postgres
+    Same env as web (minus public URL vars)
+
+  game-gateway (optional profile)
+    Build: docker/gateway.Dockerfile
+    Ports: 3001
+    Depends: postgres
+
+  postgres
+    Image: postgres:16
+    Volumes: pgdata
+    Env: POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
+
+  redis (optional profile)
+    Image: redis:7
+    For BullMQ later
+
+  caddy (optional profile)
+    Config: docker/caddy/Caddyfile
+    Reverse proxy to web, auto HTTPS
+
+VOLUMES
+  pgdata          PostgreSQL data
+  uploads         User uploads (logo, favicon, attachments, theme assets)
+  themes          Theme pack files (if not in repo)
+
+.env.example must document ALL required and optional variables.
+
+README must include:
+  • Quick start with docker-compose
+  • Manual install steps
+  • Plugin installation for Minecraft
+  • Discord bot setup
+  • Stripe/PayPal webhook URL configuration
+  • Backup/restore procedure
+
+================================================================================
+SECTION 19 — ADDITIONAL FEATURES (INCLUDE THESE)
+================================================================================
+
+These are not in the original prototype but make ServerSpot production-ready:
+
+  1.  Audit log for all admin actions
+  2.  In-app notification center
+  3.  Global admin search (Cmd+K)
+  4.  Feature flags / module toggles enforced at route + API level
+  5.  Site branding uploads with sharp optimisation
+  6.  Subdomain + custom domain support in settings model
+  7.  Maintenance mode (public site shows maintenance page)
+  8.  Health/readiness endpoints: /api/health, /api/ready
+  9.  Backup/export/import settings
+  10. Webhook delivery dashboard with retry
+  11. API usage logging per key
+  12. Soft moderation tools across forum/support/applications
+  13. Slug-based public URLs everywhere
+  14. Sitemap.xml + robots.txt generation
+  15. SEO metadata on all public pages
+  16. Cookie consent + privacy settings
+  17. Staff invitations (email invite → set password)
+  18. Multi-server/network support in data model
+  19. Command delivery queue with status tracking
+  20. Theme preview mode before publish
+  21. Order/email/template preview in admin
+  22. Duplicate product/post/form actions
+  23. Bulk import/export (products CSV, players CSV, translations)
+  24. Server status widget (online count from game-gateway) for public home
+  25. Recent purchases / recent joiners widgets for public home (configurable)
+
+================================================================================
+SECTION 20 — IMPLEMENTATION PHASES
+================================================================================
+
+Do NOT try to build everything at once. Follow these phases:
+
+PHASE 1 — FOUNDATION (Week 1-2)
+  • Monorepo scaffold (exact structure from Section 2)
+  • packages/config, packages/db, packages/observability
+  • packages/auth, packages/permissions
+  • Drizzle schema: users, roles, permissions, modules, settings
+  • apps/web: admin shell, login, dashboard skeleton
+  • apps/cli: setup, migrate, create-admin
+  • Docker compose with postgres
+  • Biome, vitest, turbo pipeline
+
+PHASE 2 — SPOT + PUBLIC SITE (Week 3-4)
+  • packages/spot: parser, renderer, sandbox
+  • Default theme pack
+  • packages/storage: uploads
+  • Theme config + schema panel
+  • Theme editor
+  • Public: home, login, profile
+  • Asset routes
+
+PHASE 3 — CORE MODULES (Week 5-8)
+  • packages/store + admin + public store/checkout
+  • packages/forum + admin + public forum
+  • packages/support + admin + public support
+  • packages/cms + admin + public blog
+  • packages/users + admin + public players
+
+PHASE 4 — PAYMENTS + FULFILMENT (Week 9-10)
+  • packages/payments: Stripe, PayPal
+  • Order flow end-to-end
+  • packages/jobs: email, fulfilment
+  • apps/worker
+  • packages/email: templates
+
+PHASE 5 — GAME INTEGRATIONS (Week 11-12)
+  • packages/game, packages/minecraft
+  • apps/game-gateway
+  • plugins/minecraft
+  • Account linking flow
+  • packages/votes (in store package or separate)
+  • Leaderboards sync
+
+PHASE 6 — REMAINING MODULES (Week 13-14)
+  • Applications
+  • Analytics (events + aggregates + charts)
+  • packages/discord + plugins/discord
+  • Developer platform: API keys, webhooks
+
+PHASE 7 — HARDENING (Week 15-16)
+  • Playwright e2e tests
+  • Rate limiting
+  • Audit logs
+  • Backup/restore CLI
+  • Security review
+  • Documentation
+  • Performance optimisation
+
+================================================================================
+SECTION 21 — NON-GOALS FOR V1
+================================================================================
+
+Do NOT prioritise unless trivial:
+  • Theme marketplace
+  • Plugin marketplace (beyond SDK example)
+  • Fully managed cloud hosting control plane
+  • Mobile native apps
+  • Advanced AI support agent (stub provider interface only)
+  • Multi-tenant SaaS (single self-hosted instance per deployment)
+  • Cryptocurrency payments
+
+================================================================================
+SECTION 22 — WORKING RULES FOR THE AI CODER
+================================================================================
+
+  1.  Build REAL backend/domain logic — not mock admin UI
+  2.  Every module respects enable/disable settings
+  3.  Every admin mutation must be authorised (RBAC)
+  4.  Every external callback/webhook must be signature-verified
+  5.  Every public-facing user content path must be sanitised
+  6.  Spot theme system is a CORE feature, not an afterthought
+  7.  Domain logic in packages/*, never in React components
+  8.  Zod schemas shared between API, forms, and job payloads
+  9.  Prefer boring, maintainable architecture over clever abstractions
+  10. Strict TypeScript — no `any` unless documented
+  11. Match ServerSpot product intent from this document
+  12. Admin design: dark, clean, flat, #88d0f8 accent, no glows
+  13. Public site: Spot-rendered, theme-configurable, CSP-hardened
+  14. Self-hosted first — everything must work with docker-compose up
+  15. Document as you build — README, .env.example, architecture docs
+
+================================================================================
+SECTION 23 — DELIVERABLES CHECKLIST
+================================================================================
+
+When complete, the repository must include:
+
+  [ ] Full monorepo matching Section 2 structure exactly
+  [ ] pnpm-workspace.yaml, turbo.json, shared tsconfig/biome/vitest
+  [ ] PostgreSQL schema + drizzle migrations + seed script
+  [ ] Default Spot theme pack in themes/default/
+  [ ] Admin dashboard for ALL modules listed in Section 4
+  [ ] Public Spot-rendered site for ALL public routes in Section 9
+  [ ] Better Auth with email/password + OAuth (Discord minimum)
+  [ ] RBAC with roles and granular permissions
+  [ ] Stripe + PayPal checkout flow
+  [ ] Order fulfilment via game-gateway
+  [ ] Discord integration (OAuth + role sync minimum)
+  [ ] Vote callback + claim flow
+  [ ] Application form builder + review workflow
+  [ ] Analytics event collection + dashboard charts
+  [ ] Developer API keys + webhooks
+  [ ] Background worker with outbox pattern
+  [ ] CLI: setup, doctor, migrate, seed, create-admin, backup
+  [ ] Docker Compose for local/self-hosted deployment
+  [ ] React Email templates for all events in Section 13
+  [ ] Vitest tests for critical paths in Section 16
+  [ ] Playwright e2e for key user flows
+  [ ] .env.example with all variables documented
+  [ ] README with install, configure, deploy instructions
+  [ ] Architecture docs explaining package boundaries
+  [ ] Plugin SDK example in plugins/example-plugin/
+  [ ] Minecraft plugin in plugins/minecraft/
+
+================================================================================
+SECTION 24 — REFERENCE: ORIGINAL SERVER SPOT CONTEXT
+================================================================================
+
+The Rust/Dioxus prototype (serverspot repo) contains:
+  • Admin-reskin branch with polished dark admin UI (UX reference)
+  • Spot template system (partially implemented — use as spec)
+  • 9 feature modules with detailed admin page designs
+  • i18n with en/de/es/fr translation files (content reference)
+  • SurrealDB schema stubs (module + global_setting pattern)
+  • Theme pack in themes/default/ (structure reference)
+  • Route definitions in src/router.rs (route map reference)
+  • Admin component designs in src/components/ (UX/copy reference)
+
+Implementation maturity of prototype:
+  • Admin UI: detailed mockups with realistic copy — USE AS UX SPEC
+  • Public site: Spot rendering works — USE AS RENDERING SPEC
+  • Backend: mostly placeholder — BUILD FRESH
+  • Auth: placeholder — BUILD FRESH with better-auth
+  • Store/forum/etc: UI only — BUILD FULL DOMAIN LOGIC
+
+Design reference for admin:
+  • Background: #0B0B0D
+  • Cards: #101013
+  • Borders: #2a2a32
+  • Accent: #88d0f8
+  • Font: Outfit or Inter
+  • Border radius: 0.65rem (buttons), 0.9rem (cards)
+  • Flat, clean, no glows
+
+================================================================================
+END OF SPECIFICATION
+================================================================================
+
+START HERE:
+  1. Scaffold monorepo (Section 2)
+  2. packages/db + packages/config + packages/auth + packages/permissions
+  3. apps/web admin shell + login
+  4. apps/cli setup/migrate/create-admin
+  5. packages/spot + themes/default/
+  6. Implement modules in phase order (Section 20)
+
+Ask clarifying questions only when this spec is genuinely ambiguous.
+Otherwise, execute.

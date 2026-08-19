@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ item.title }} — Blog</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="page article">
+    <a href="/blog" class="back">← Back to blog</a>
+    <h1>{{ item.title }}</h1>
+    <p class="meta">by {{ item.author }}</p>
+    <div class="post-body">{!! item.body !!}</div>
+  </main>
+  @include('assets/footer.html')
+</body>
+</html>

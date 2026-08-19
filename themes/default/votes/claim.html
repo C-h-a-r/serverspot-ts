@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claim vote reward — {{ site.name }}</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="page">
+    @if (claim.valid)
+      <h1>Claim your vote reward</h1>
+      <p>Username: <strong>{{ claim.username }}</strong></p>
+      @if (claim.loggedIn)
+        <button class="btn" id="claim-btn" data-token="{{ claim.token }}">Claim reward</button>
+        <p id="claim-status" class="muted"></p>
+      @else
+        <p><a href="/login" class="btn">Sign in to claim</a></p>
+      @endif
+    @else
+      <h1>Invalid claim</h1>
+      <p>{{ claim.message }}</p>
+      <a href="/votes" class="btn">Back to vote page</a>
+    @endif
+  </main>
+
+  <script>
+    document.getElementById('claim-btn')?.addEventListener('click', async function(btn) {
+      btn.disabled = true;
+      const status = document.getElementById('claim-status');
+      try {
+        const res = await fetch('/api/votes/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: btn.dataset.token }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Claim failed');
+        status.textContent = 'Reward claimed! Thanks for voting.';
+      } catch (err) {
+        status.textContent = err.message || 'Claim failed';
+        btn.disabled = false;
+      }
+    });
+  </script>
+  @include('assets/footer.html')
+</body>
+</html>

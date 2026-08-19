@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ item.name }} — Players</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="page profile-page">
+    <a href="/players" class="back">← All players</a>
+    <h1>{{ item.name }}</h1>
+    @if (item.bio)
+      <p>{{ item.bio }}</p>
+    @endif
+    <p class="meta">Playtime: {{ item.playtime }} minutes</p>
+    @if (item.linkedAccounts)
+      <h2>Linked accounts</h2>
+      @foreach (item.linkedAccounts as account)
+        <p>{{ account.platform }}: {{ account.username }}</p>
+      @endforeach
+    @endif
+  </main>
+  @include('assets/footer.html')
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "name": "@serverspot/vitest-config",
+  "version": "0.0.0",
+  "private": true,
+  "files": ["vitest.config.ts"]
+}

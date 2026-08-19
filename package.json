@@ -1,0 +1,23 @@
+{
+  "name": "serverspot",
+  "private": true,
+  "packageManager": "pnpm@11.5.2",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "format": "biome format --write .",
+    "check": "biome check --write .",
+    "db:generate": "pnpm --filter @serverspot/db generate",
+    "db:migrate": "pnpm --filter @serverspot/db migrate",
+    "db:studio": "pnpm --filter @serverspot/db studio",
+    "cli": "pnpm --filter @serverspot/cli dev"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.3"
+  }
+}

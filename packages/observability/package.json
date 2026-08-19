@@ -1,0 +1,21 @@
+{
+  "name": "@serverspot/observability",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0"
+  },
+  "devDependencies": {
+    "@serverspot/tsconfig": "workspace:*",
+    "typescript": "^5.7.3"
+  }
+}

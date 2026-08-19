@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ form.name }} — {{ site.name }}</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="page">
+    <p><a href="/applications">← Back to applications</a></p>
+    <h1>{{ form.name }}</h1>
+    @if (form.description)
+      <p>{{ form.description }}</p>
+    @endif
+
+    <form id="application-form" class="stack">
+      <input type="hidden" name="formId" value="{{ form.id }}">
+
+      <label>
+        Display name
+        <input type="text" name="applicantName" required>
+      </label>
+
+      <label>
+        Email
+        <input type="email" name="applicantEmail" required>
+      </label>
+
+      @foreach (questions as question)
+        <label>
+          {{ question.label }}
+          @if (question.type === 'textarea')
+            <textarea name="q_{{ question.id }}" @if (question.required) required @endif></textarea>
+          @elseif (question.type === 'select')
+            <select name="q_{{ question.id }}" @if (question.required) required @endif>
+              <option value="">Select…</option>
+              @foreach (question.options as option)
+                <option value="{{ option }}">{{ option }}</option>
+              @endforeach
+            </select>
+          @else
+            <input type="text" name="q_{{ question.id }}" @if (question.required) required @endif>
+          @endif
+        </label>
+      @endforeach
+
+      <button type="submit" class="btn">Submit application</button>
+    </form>
+  </main>
+
+  <script>
+    document.getElementById('application-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const fd = new FormData(form);
+      const answers = [];
+      @foreach (questions as question)
+        answers.push({ questionId: '{{ question.id }}', value: fd.get('q_{{ question.id }}') || '' });
+      @endforeach
+      const res = await fetch('/applications/form/{{ form.slug }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicantName: fd.get('applicantName'),
+          applicantEmail: fd.get('applicantEmail'),
+          answers,
+        }),
+      });
+      if (res.redirected) window.location.href = res.url;
+      else window.location.href = '/applications?submitted=1';
+    });
+  </script>
+  @include('assets/footer.html')
+</body>
+</html>

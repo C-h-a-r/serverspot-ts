@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ board.name }} — {{ site.name }}</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="page">
+    <a href="/leaderboards" class="back">← All leaderboards</a>
+    <h1>{{ board.name }}</h1>
+    @if (board.description)
+      <p>{{ board.description }}</p>
+    @endif
+
+    <table class="rankings">
+      <thead>
+        <tr><th>#</th><th>Player</th><th>Score</th></tr>
+      </thead>
+      <tbody>
+        @foreach (entries as entry)
+          <tr>
+            <td>{{ entry.rank }}</td>
+            <td>{{ entry.player }}</td>
+            <td>{{ entry.value }}</td>
+          </tr>
+        @endforeach
+      </tbody>
+    </table>
+  </main>
+  @include('assets/footer.html')
+</body>
+</html>

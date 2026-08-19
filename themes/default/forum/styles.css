@@ -1,0 +1,7 @@
+.thread-row { display: block; padding: 1rem; border-bottom: 1px solid var(--border); text-decoration: none; color: inherit; }
+.thread-row:hover { background: var(--surface); }
+.thread-row .title { display: block; font-weight: 600; }
+.thread-row .meta { font-size: 0.8125rem; color: var(--text-muted); }
+.post { margin-top: 1rem; padding: 1rem; background: var(--surface); border-radius: 0.65rem; border: 1px solid var(--border); }
+.post-meta { font-size: 0.8125rem; color: var(--config-accent-colour); margin-bottom: 0.5rem; }
+.post-body { white-space: pre-wrap; }

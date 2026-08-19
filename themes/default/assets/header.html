@@ -1,0 +1,13 @@
+<header class="site-header">
+  <a href="/" class="logo">{{ site.name }}</a>
+  <nav>
+    <a href="/store">Store</a>
+    <a href="/forum">Forum</a>
+    <a href="/support">Support</a>
+    @if (user)
+      <a href="/profile">Profile</a>
+    @else
+      <a href="/login">Sign in</a>
+    @endif
+  </nav>
+</header>

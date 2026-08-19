@@ -1,0 +1,27 @@
+{
+  "name": "@serverspot/spot",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./parser": "./src/parser.ts",
+    "./renderer": "./src/renderer.ts",
+    "./sandbox": "./src/sandbox.ts",
+    "./loader": "./src/loader.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "sanitize-html": "^2.14.0"
+  },
+  "devDependencies": {
+    "@serverspot/tsconfig": "workspace:*",
+    "@types/sanitize-html": "^2.13.0",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

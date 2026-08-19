@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Community Stats — {{ site.name }}</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="page">
+    <h1>Community Stats</h1>
+    <p>Live metrics from our platform (last 7 days where noted).</p>
+
+    <section class="stats-grid">
+      <article class="card stat">
+        <h2>Page views</h2>
+        <p class="stat-value">{{ stats.pageViews }}</p>
+      </article>
+      <article class="card stat">
+        <h2>New members</h2>
+        <p class="stat-value">{{ stats.registrations }}</p>
+      </article>
+      <article class="card stat">
+        <h2>Total events</h2>
+        <p class="stat-value">{{ stats.totalEvents }}</p>
+      </article>
+    </section>
+  </main>
+  @include('assets/footer.html')
+</body>
+</html>

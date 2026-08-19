@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Store — {{ site.name }}</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="page">
+    <h1>Store</h1>
+    <div class="grid">
+      @foreach (products as product)
+        <a href="/store/product/{{ product.slug }}" class="card">
+          <h2>{{ product.name }}</h2>
+          <p class="price">{{ product.price }}</p>
+          @if (product.description)
+            <p class="muted">{{ product.description }}</p>
+          @endif
+        </a>
+      @endforeach
+    </div>
+  </main>
+  @include('assets/footer.html')
+</body>
+</html>

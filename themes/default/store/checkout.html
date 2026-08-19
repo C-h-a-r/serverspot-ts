@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout — {{ site.name }}</title>
+  @include('assets/header.html')
+</head>
+<body>
+  <main class="page checkout-page">
+    <a href="/store" class="back">← Back to store</a>
+    <h1>Checkout</h1>
+
+    @if (checkout.cancelled)
+      <p class="notice">Checkout was cancelled. Your cart is still saved.</p>
+    @endif
+
+    @if (checkout.error)
+      <p class="notice error">Payment failed. Please try again.</p>
+    @endif
+
+    @if (cart.itemCount)
+      <section class="cart-summary">
+        <h2>Your cart ({{ cart.itemCount }} items)</h2>
+        @foreach (cart.items as item)
+          <div class="cart-line">
+            <span>{{ item.quantity }}x {{ item.name }}</span>
+            <span>{{ item.lineTotal }}</span>
+          </div>
+        @endforeach
+        <p class="cart-total"><strong>Total: {{ cart.subtotal }}</strong></p>
+      </section>
+
+      <section class="payment-methods">
+        <h2>Pay with</h2>
+        @if (checkout.stripeEnabled)
+          <button class="btn checkout-btn" data-provider="stripe" data-cart-id="{{ cart.id }}">Stripe</button>
+        @endif
+        @if (checkout.paypalEnabled)
+          <button class="btn checkout-btn" data-provider="paypal" data-cart-id="{{ cart.id }}">PayPal</button>
+        @endif
+        @if (!checkout.stripeEnabled && !checkout.paypalEnabled)
+          <p class="notice">No payment providers configured. Add Stripe or PayPal keys in your environment.</p>
+        @endif
+      </section>
+    @else
+      <p>Your cart is empty. <a href="/store">Browse the store</a>.</p>
+    @endif
+  </main>
+
+  <script>
+    document.querySelectorAll('.checkout-btn').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        btn.disabled = true;
+        btn.textContent = 'Redirecting…';
+        try {
+          const res = await fetch('/api/store/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              cartId: btn.dataset.cartId,
+              provider: btn.dataset.provider,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Checkout failed');
+          const url = data.checkoutUrl || data.approvalUrl;
+          if (url) window.location.href = url;
+        } catch (err) {
+          alert(err.message || 'Checkout failed');
+          btn.disabled = false;
+          btn.textContent = btn.dataset.provider === 'stripe' ? 'Stripe' : 'PayPal';
+        }
+      });
+    });
+  </script>
+  @include('assets/footer.html')
+</body>
+</html>
