@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 #
 # ServerSpot one-command production installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/C-h-a-r/serverspot-ts/main/scripts/install.sh | sudo bash
+#
+# Recommended:
+#   curl -fsSL https://raw.githubusercontent.com/C-h-a-r/serverspot-ts/main/scripts/install.sh -o install.sh
+#   sudo bash install.sh
+#
+# Also works (pipe):
+#   curl -fsSL https://raw.githubusercontent.com/C-h-a-r/serverspot-ts/main/scripts/install.sh | sudo bash
 #
 set -euo pipefail
 
@@ -11,8 +17,8 @@ readonly REPO_BRANCH="main"
 readonly INSTALL_DIR="/opt/serverspot"
 readonly CTL_BIN="/usr/local/bin/serverspot"
 
-# ─── Colors ───────────────────────────────────────────────────────────────────
-if [[ -t 1 ]]; then
+# ─── Colors (enable when we have a real terminal via /dev/tty) ────────────────
+if [[ -n "${TERM:-}" && "${TERM}" != "dumb" && -e /dev/tty ]]; then
   readonly RED='\033[0;31m'
   readonly GREEN='\033[0;32m'
   readonly YELLOW='\033[1;33m'
@@ -29,72 +35,101 @@ STEP=0
 TOTAL_STEPS=8
 UPDATE_MODE=false
 
+# ─── Terminal I/O (always use /dev/tty so prompts work when script is piped) ─
+require_tty() {
+  if [[ ! -e /dev/tty ]]; then
+    echo "ERROR: No terminal found." >&2
+    echo "Download the script first, then run it:" >&2
+    echo "  curl -fsSL https://raw.githubusercontent.com/C-h-a-r/serverspot-ts/main/scripts/install.sh -o install.sh" >&2
+    echo "  sudo bash install.sh" >&2
+    exit 1
+  fi
+}
+
+# Print a line to the user's terminal (not stdout — that may be a pipe).
+tty_echo() {
+  printf '%b\n' "$*" >/dev/tty
+}
+
+# Print without trailing newline (for prompts).
+tty_print() {
+  printf '%b' "$*" >/dev/tty
+}
+
 # ─── UI helpers ───────────────────────────────────────────────────────────────
 print_banner() {
-  clear || true
-  echo -e "${CYAN}${BOLD}"
-  cat <<'BANNER'
-
-   ███████╗███████╗██████╗ ██╗   ██╗███████╗██████╗ ███████╗██████╗  ██████╗ ████████╗
-   ██╔════╝██╔════╝██╔══██╗██║   ██║██╔════╝██╔══██╗██╔════╝██╔══██╗██╔═══██╗╚══██╔══╝
-   ███████╗█████╗  ██████╔╝██║   ██║█████╗  ██████╔╝█████╗  ██████╔╝██║   ██║   ██║
-   ╚════██║██╔══╝  ██╔══██╗╚██╗ ██╔╝██╔══╝  ██╔══██╗██╔══╝  ██╔═══╝ ██║   ██║   ██║
-   ███████║███████╗██║  ██║ ╚████╔╝ ███████╗██║  ██║███████╗██║     ╚██████╔╝   ██║
-   ╚══════╝╚══════╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝      ╚═════╝    ╚═╝
-
-BANNER
-  echo -e "${NC}${DIM}  Production installer — store, community, support & game integrations${NC}"
-  echo ""
+  if [[ -e /dev/tty ]]; then
+    clear >/dev/tty 2>/dev/null || true
+  fi
+  tty_echo "${CYAN}${BOLD}"
+  tty_echo ""
+  tty_echo "   ███████╗███████╗██████╗ ██╗   ██╗███████╗██████╗ ███████╗██████╗  ██████╗ ████████╗"
+  tty_echo "   ██╔════╝██╔════╝██╔══██╗██║   ██║██╔════╝██╔══██╗██╔════╝██╔══██╗██╔═══██╗╚══██╔══╝"
+  tty_echo "   ███████╗█████╗  ██████╔╝██║   ██║█████╗  ██████╔╝█████╗  ██████╔╝██║   ██║   ██║"
+  tty_echo "   ╚════██║██╔══╝  ██╔══██╗╚██╗ ██╔╝██╔══╝  ██╔══██╗██╔══╝  ██╔═══╝ ██║   ██║   ██║"
+  tty_echo "   ███████║███████╗██║  ██║ ╚████╔╝ ███████╗██║  ██║███████╗██║     ╚██████╔╝   ██║"
+  tty_echo "   ╚══════╝╚══════╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝      ╚═════╝    ╚═╝"
+  tty_echo "${NC}${DIM}  Production installer — store, community, support & game integrations${NC}"
+  tty_echo ""
 }
 
 step() {
   STEP=$((STEP + 1))
-  echo ""
-  echo -e "${BLUE}${BOLD}  [$STEP/$TOTAL_STEPS]${NC} ${BOLD}$1${NC}"
-  echo -e "${DIM}  ─────────────────────────────────────────────────────────${NC}"
+  tty_echo ""
+  tty_echo "${BLUE}${BOLD}  [$STEP/$TOTAL_STEPS]${NC} ${BOLD}$1${NC}"
+  tty_echo "${DIM}  ─────────────────────────────────────────────────────────${NC}"
 }
 
-info()  { echo -e "  ${CYAN}›${NC} $*"; }
-ok()    { echo -e "  ${GREEN}✓${NC} $*"; }
-warn()  { echo -e "  ${YELLOW}!${NC} $*"; }
-fail()  { echo -e "  ${RED}✗${NC} $*" >&2; exit 1; }
+info()  { tty_echo "  ${CYAN}›${NC} $*"; }
+ok()    { tty_echo "  ${GREEN}✓${NC} $*"; }
+warn()  { tty_echo "  ${YELLOW}!${NC} $*"; }
+fail()  { tty_echo "  ${RED}✗${NC} $*"; exit 1; }
+
+read_tty() {
+  local var_name="$1"
+  local value=""
+  if ! IFS= read -r value </dev/tty; then
+    fail "Could not read input. Try: curl -fsSL ... -o install.sh && sudo bash install.sh"
+  fi
+  printf -v "$var_name" '%s' "$value"
+}
+
+read_secret_tty() {
+  local var_name="$1"
+  local value=""
+  if ! IFS= read -rs value </dev/tty; then
+    fail "Could not read input. Try: curl -fsSL ... -o install.sh && sudo bash install.sh"
+  fi
+  tty_echo ""
+  printf -v "$var_name" '%s' "$value"
+}
 
 ask() {
   local prompt="$1" default="${2:-}" answer=""
   if [[ -n "$default" ]]; then
-    echo -ne "  ${BOLD}$prompt${NC} ${DIM}[$default]${NC}: "
+    tty_print "  ${BOLD}${prompt}${NC} ${DIM}[${default}]${NC}: "
   else
-    echo -ne "  ${BOLD}$prompt${NC}: "
+    tty_print "  ${BOLD}${prompt}${NC}: "
   fi
-  read -r answer </dev/tty
-  echo "${answer:-$default}"
+  read_tty answer
+  if [[ -z "$answer" && -n "$default" ]]; then
+    answer="$default"
+  fi
+  printf '%s' "$answer"
 }
 
 ask_secret() {
   local prompt="$1" answer=""
-  echo -ne "  ${BOLD}$prompt${NC}: "
-  read -rs answer </dev/tty
-  echo "" >&2
-  echo "$answer"
+  tty_print "  ${BOLD}${prompt}${NC}: "
+  read_secret_tty answer
+  printf '%s' "$answer"
 }
 
 confirm() {
   local prompt="$1" answer=""
-  echo -ne "  ${BOLD}$prompt${NC} ${DIM}[y/N]${NC}: "
-  read -r answer </dev/tty
+  tty_print "  ${BOLD}${prompt}${NC} ${DIM}[y/N]${NC}: "
+  read_tty answer
   [[ "$answer" =~ ^[Yy]$ ]]
-}
-
-spinner_wait() {
-  local message="$1" cmd="$2" i=0
-  local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
-  echo -ne "  ${CYAN}${frames[0]}${NC} $message"
-  while eval "$cmd"; do
-    printf "\r  ${CYAN}%s${NC} $message" "${frames[$((i % ${#frames[@]}))]}"
-    i=$((i + 1))
-    sleep 0.15
-  done
-  printf "\r"
 }
 
 generate_secret() {
@@ -103,7 +138,7 @@ generate_secret() {
 
 require_root() {
   if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-    fail "Please run as root: curl -fsSL ... | sudo bash"
+    fail "Please run as root: sudo bash install.sh"
   fi
 }
 
@@ -162,34 +197,34 @@ clone_or_update_repo() {
 
 # ─── Questionnaire ────────────────────────────────────────────────────────────
 run_questionnaire() {
-  echo ""
-  echo -e "  ${BOLD}Let's configure your instance.${NC} ${DIM}Press Enter to accept defaults.${NC}"
-  echo ""
+  tty_echo ""
+  tty_echo "  ${BOLD}Let's configure your instance.${NC} ${DIM}Type your answers and press Enter.${NC}"
+  tty_echo ""
 
-  DOMAIN=$(ask "Your domain (must point to this server)" "")
+  DOMAIN="$(ask "Your domain (must point to this server)" "")"
   while [[ -z "$DOMAIN" ]]; do
     warn "Domain is required for HTTPS and login redirects"
-    DOMAIN=$(ask "Your domain" "")
+    DOMAIN="$(ask "Your domain" "")"
   done
 
   APP_URL="https://${DOMAIN}"
 
-  echo ""
-  echo -e "  ${BOLD}Admin account${NC} ${DIM}(used to sign in at /login)${NC}"
-  ADMIN_NAME=$(ask "Admin name" "Admin")
-  ADMIN_EMAIL=$(ask "Admin email" "")
+  tty_echo ""
+  tty_echo "  ${BOLD}Admin account${NC} ${DIM}(used to sign in at /login)${NC}"
+  ADMIN_NAME="$(ask "Admin name" "Admin")"
+  ADMIN_EMAIL="$(ask "Admin email" "")"
   while [[ -z "$ADMIN_EMAIL" ]]; do
     warn "Email is required"
-    ADMIN_EMAIL=$(ask "Admin email" "")
+    ADMIN_EMAIL="$(ask "Admin email" "")"
   done
 
   while true; do
-    ADMIN_PASSWORD=$(ask_secret "Admin password (min 8 characters)")
+    ADMIN_PASSWORD="$(ask_secret "Admin password (min 8 characters)")"
     if [[ ${#ADMIN_PASSWORD} -lt 8 ]]; then
       warn "Password must be at least 8 characters"
       continue
     fi
-    ADMIN_PASSWORD_CONFIRM=$(ask_secret "Confirm password")
+    ADMIN_PASSWORD_CONFIRM="$(ask_secret "Confirm password")"
     if [[ "$ADMIN_PASSWORD" != "$ADMIN_PASSWORD_CONFIRM" ]]; then
       warn "Passwords do not match — try again"
       continue
@@ -197,35 +232,35 @@ run_questionnaire() {
     break
   done
 
-  echo ""
+  tty_echo ""
   if confirm "Generate a secure database password automatically?"; then
-    POSTGRES_PASSWORD=$(generate_secret)
+    POSTGRES_PASSWORD="$(generate_secret)"
     ok "Database password generated"
   else
-    POSTGRES_PASSWORD=$(ask_secret "PostgreSQL password")
+    POSTGRES_PASSWORD="$(ask_secret "PostgreSQL password")"
     while [[ ${#POSTGRES_PASSWORD} -lt 8 ]]; do
       warn "Use at least 8 characters"
-      POSTGRES_PASSWORD=$(ask_secret "PostgreSQL password")
+      POSTGRES_PASSWORD="$(ask_secret "PostgreSQL password")"
     done
   fi
 
-  AUTH_SECRET=$(generate_secret)
+  AUTH_SECRET="$(generate_secret)"
 
-  echo ""
-  echo -e "  ${BOLD}Optional integrations${NC} ${DIM}(press Enter to skip each)${NC}"
+  tty_echo ""
+  tty_echo "  ${BOLD}Optional integrations${NC} ${DIM}(y/N prompts — Enter skips)${NC}"
   ENABLE_GATEWAY=false
   if confirm "Enable game gateway (Minecraft linking, port 3001)?"; then
     ENABLE_GATEWAY=true
-    GAME_GATEWAY_SECRET=$(generate_secret)
+    GAME_GATEWAY_SECRET="$(generate_secret)"
   fi
 
   SMTP_HOST=""
   if confirm "Configure email (SMTP) now?"; then
-    SMTP_HOST=$(ask "SMTP host" "")
-    SMTP_PORT=$(ask "SMTP port" "587")
-    SMTP_USER=$(ask "SMTP username" "")
-    SMTP_PASS=$(ask_secret "SMTP password")
-    SMTP_FROM=$(ask "From address" "noreply@${DOMAIN}")
+    SMTP_HOST="$(ask "SMTP host" "")"
+    SMTP_PORT="$(ask "SMTP port" "587")"
+    SMTP_USER="$(ask "SMTP username" "")"
+    SMTP_PASS="$(ask_secret "SMTP password")"
+    SMTP_FROM="$(ask "From address" "noreply@${DOMAIN}")"
   fi
 }
 
@@ -297,6 +332,7 @@ run_setup() {
 
 # ─── Main install flow ────────────────────────────────────────────────────────
 main() {
+  require_tty
   print_banner
   require_root
 
@@ -368,34 +404,30 @@ main() {
   step "Finishing up"
   install_ctl
 
-  echo ""
-  echo -e "${GREEN}${BOLD}"
-  cat <<DONE
-
-  ╔══════════════════════════════════════════════════════════════╗
-  ║                    Installation complete!                    ║
-  ╚══════════════════════════════════════════════════════════════╝
-
-DONE
-  echo -e "${NC}"
-  echo -e "  ${BOLD}Your site${NC}     ${CYAN}${APP_URL}${NC}"
-  echo -e "  ${BOLD}Admin login${NC}   ${CYAN}${APP_URL}/login${NC}"
-  echo -e "  ${BOLD}Dashboard${NC}     ${CYAN}${APP_URL}/admin${NC}"
-  echo ""
+  tty_echo ""
+  tty_echo "${GREEN}${BOLD}"
+  tty_echo "  ╔══════════════════════════════════════════════════════════════╗"
+  tty_echo "  ║                    Installation complete!                    ║"
+  tty_echo "  ╚══════════════════════════════════════════════════════════════╝"
+  tty_echo "${NC}"
+  tty_echo "  ${BOLD}Your site${NC}     ${CYAN}${APP_URL}${NC}"
+  tty_echo "  ${BOLD}Admin login${NC}   ${CYAN}${APP_URL}/login${NC}"
+  tty_echo "  ${BOLD}Dashboard${NC}     ${CYAN}${APP_URL}/admin${NC}"
+  tty_echo ""
   if [[ "$UPDATE_MODE" != true ]]; then
-    echo -e "  ${BOLD}Admin email${NC}   ${ADMIN_EMAIL}"
-    echo -e "  ${DIM}Password      (the one you chose during setup)${NC}"
-    echo ""
+    tty_echo "  ${BOLD}Admin email${NC}   ${ADMIN_EMAIL}"
+    tty_echo "  ${DIM}Password      (the one you chose during setup)${NC}"
+    tty_echo ""
   fi
-  echo -e "  ${BOLD}Manage your instance${NC}"
-  echo -e "  ${DIM}serverspot status${NC}   — check service health"
-  echo -e "  ${DIM}serverspot logs${NC}     — follow application logs"
-  echo -e "  ${DIM}serverspot update${NC}   — pull updates & restart"
-  echo -e "  ${DIM}serverspot restart${NC}  — restart all services"
-  echo ""
-  echo -e "  ${YELLOW}Make sure DNS for ${DOMAIN} points to this server's IP.${NC}"
-  echo -e "  ${DIM}HTTPS certificates are issued automatically by Caddy.${NC}"
-  echo ""
+  tty_echo "  ${BOLD}Manage your instance${NC}"
+  tty_echo "  ${DIM}serverspot status${NC}   — check service health"
+  tty_echo "  ${DIM}serverspot logs${NC}     — follow application logs"
+  tty_echo "  ${DIM}serverspot update${NC}   — pull updates & restart"
+  tty_echo "  ${DIM}serverspot restart${NC}  — restart all services"
+  tty_echo ""
+  tty_echo "  ${YELLOW}Make sure DNS for ${DOMAIN} points to this server's IP.${NC}"
+  tty_echo "  ${DIM}HTTPS certificates are issued automatically by Caddy.${NC}"
+  tty_echo ""
 }
 
 main "$@"

@@ -96,6 +96,13 @@ Open [http://localhost:3000/login](http://localhost:3000/login) and sign in with
 Install ServerSpot on a fresh Linux VPS with HTTPS, Docker, and automatic restarts:
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/C-h-a-r/serverspot-ts/main/scripts/install.sh -o install.sh
+sudo bash install.sh
+```
+
+Or pipe directly (also supported):
+
+```bash
 curl -fsSL https://raw.githubusercontent.com/C-h-a-r/serverspot-ts/main/scripts/install.sh | sudo bash
 ```
 
