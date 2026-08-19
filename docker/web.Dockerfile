@@ -10,6 +10,13 @@ COPY tooling/*/package.json ./tooling/
 RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
+ARG NEXT_PUBLIC_APP_URL=http://localhost:3000
+ARG AUTH_SECRET=build-time-placeholder-secret-minimum-32-characters
+ARG DATABASE_URL=postgresql://build:build@localhost:5432/build
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+ENV AUTH_SECRET=$AUTH_SECRET
+ENV DATABASE_URL=$DATABASE_URL
+ENV SKIP_ENV_VALIDATION=true
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm --filter @serverspot/web build

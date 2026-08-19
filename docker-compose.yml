@@ -5,9 +5,9 @@ services:
     environment:
       POSTGRES_DB: serverspot
       POSTGRES_USER: serverspot
-      POSTGRES_PASSWORD: serverspot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-serverspot}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -20,9 +20,13 @@ services:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+        AUTH_SECRET: ${AUTH_SECRET:-build-time-placeholder-secret-minimum-32-characters}
+        DATABASE_URL: ${DATABASE_URL:-postgresql://build:build@localhost:5432/build}
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     env_file:
       - .env
     depends_on:
@@ -44,6 +48,18 @@ services:
     volumes:
       - uploads:/app/uploads
 
+  setup:
+    profiles: ["setup"]
+    build:
+      context: .
+      dockerfile: docker/setup.Dockerfile
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    working_dir: /app
+
   game-gateway:
     profiles: ["gateway"]
     build:
@@ -63,7 +79,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
 
   caddy:
     profiles: ["caddy"]

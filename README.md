@@ -91,7 +91,38 @@ pnpm dev
 
 Open [http://localhost:3000/login](http://localhost:3000/login) and sign in with your admin account.
 
-## Available Scripts
+## One-Command VPS Install (Production)
+
+Install ServerSpot on a fresh Linux VPS with HTTPS, Docker, and automatic restarts:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/C-h-a-r/serverspot-ts/main/scripts/install.sh | sudo bash
+```
+
+**Requirements:** Ubuntu/Debian (or similar), root access, domain DNS pointing to the server.
+
+The installer will:
+
+1. Install Docker (if needed)
+2. Ask for your domain, admin account, and optional SMTP / game gateway
+3. Build and start PostgreSQL, web, worker, and Caddy (HTTPS)
+4. Run migrations, seed data, and create your admin user
+5. Install the `serverspot` management command
+
+After install:
+
+| Command | Description |
+|---------|-------------|
+| `serverspot status` | Container status + health check |
+| `serverspot logs` | Follow web and worker logs |
+| `serverspot restart` | Restart all services |
+| `serverspot update` | Pull latest code, migrate, rebuild |
+| `serverspot migrate` | Run database migrations |
+| `serverspot doctor` | Validate env and database connection |
+
+Install location: `/opt/serverspot`
+
+## Quick Start (Development)
 
 | Command | Description |
 |---------|-------------|
@@ -108,7 +139,9 @@ Open [http://localhost:3000/login](http://localhost:3000/login) and sign in with
 | `pnpm db:generate` | Generate Drizzle migrations |
 | `pnpm db:studio` | Open Drizzle Studio |
 
-## Docker Deployment
+## Docker Deployment (Manual)
+
+If you prefer manual control instead of the install script:
 
 ```bash
 # PostgreSQL only (development)
@@ -120,7 +153,7 @@ docker compose up -d web worker
 # With game gateway
 docker compose --profile gateway up -d
 
-# With Caddy reverse proxy
+# With Caddy reverse proxy + HTTPS
 docker compose --profile caddy up -d
 ```
 

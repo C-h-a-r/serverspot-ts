@@ -4,16 +4,16 @@ WORKDIR /app
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/cli/package.json ./apps/cli/
+COPY apps/worker/package.json ./apps/worker/
+COPY apps/web/package.json ./apps/web/
 COPY apps/game-gateway/package.json ./apps/game-gateway/
 COPY packages/*/package.json ./packages/
 COPY tooling/*/package.json ./tooling/
 RUN pnpm install --frozen-lockfile
 
 FROM base AS runner
-ENV NODE_ENV=production
-WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-WORKDIR /app/apps/game-gateway
-EXPOSE 3001
-CMD ["pnpm", "exec", "tsx", "src/index.ts"]
+WORKDIR /app
+ENTRYPOINT ["pnpm", "cli"]
